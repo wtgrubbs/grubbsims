@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chemical Reaction Dynamics (Langevin Model)</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f7f9; display: flex; flex-direction: column; align-items: center; padding: 20px; color: #333; margin: 0; }
+        .header-container { text-align: center; margin-bottom: 15px; }
+        h2 { margin-bottom: 5px; color: #2c3e50; }
+        .container { display: flex; gap: 30px; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); max-width: 1100px; position: relative; }
+        canvas { border: 2px solid #e0e0e0; border-radius: 10px; background: #fff; }
+        .controls { width: 340px; display: flex; flex-direction: column; gap: 12px; }
+        .control-group { display: flex; flex-direction: column; border-bottom: 1px solid #f0f0f0; padding-bottom: 8px; }
+        label { font-size: 0.85em; font-weight: 700; margin-bottom: 6px; color: #555; text-transform: uppercase; }
+        input[type="range"] { width: 100%; cursor: pointer; }
+        .stats-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.9em; }
+        .stats-table th, .stats-table td { border: 1px solid #eee; padding: 8px; text-align: center; }
+        .buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 5px; }
+        button { flex: 1 1 45%; padding: 10px; cursor: pointer; border: none; border-radius: 6px; font-weight: bold; transition: 0.2s; font-size: 0.85em; }
+        .btn-play { background: #007bff; color: white; }
+        .btn-reset { background: #6c757d; color: white; }
+        .btn-clear { background: #fd7e14; color: white; flex: 1 1 100%; }
+        .btn-info { background: #17a2b8; color: white; flex: 1 1 45%; font-size: 0.8em; }
+        .btn-langevin { background: #6f42c1; color: white; flex: 1 1 45%; font-size: 0.8em; }
+        button:hover { filter: brightness(1.1); }
+        .val { font-weight: bold; float: right; color: #007bff; }
+        .legend { font-size: 0.8em; margin-top: 10px; display: flex; gap: 15px; justify-content: center; }
+        .legend-item { display: flex; align-items: center; gap: 5px; }
+        .box { width: 12px; height: 12px; border-radius: 2px; }
+        
+        /* Modal Styles */
+        .modal { display: none; position: absolute; top: 25px; left: 25px; width: 550px; background: rgba(255, 255, 255, 0.95); border: 2px solid; border-radius: 10px; padding: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); z-index: 10; backdrop-filter: blur(5px); }
+        .modal-units { border-color: #17a2b8; }
+        .modal-units h3 { color: #17a2b8; }
+        .modal-langevin { border-color: #6f42c1; }
+        .modal-langevin h3 { color: #6f42c1; }
+        .modal h3 { margin-top: 0; border-bottom: 2px solid #eee; padding-bottom: 5px; }
+        .modal p, .modal li { font-size: 0.9em; line-height: 1.5; color: #444; }
+        .modal ul { padding-left: 20px; }
+        .modal li { margin-bottom: 8px; }
+        .close-btn { float: right; cursor: pointer; color: #aaa; font-weight: bold; font-size: 1.2em; border: none; background: none; padding: 0; }
+        .close-btn:hover { color: #333; }
+    </style>
+</head>
+<body>
+
+    <div class="header-container">
+        <h2>Chemical Reaction Dynamics (Langevin Model)</h2>
+    </div>
+
+    <div class="container">
+        <div class="modal modal-units" id="infoPanel">
+            <button class="close-btn" onclick="document.getElementById('infoPanel').style.display='none'">&times;</button>
+            <h3>Understanding the Units</h3>
+            <p>In computational chemistry, simulations are often run using <strong>Reduced (Dimensionless) Units</strong>. This prevents computers from making rounding errors when dealing with extremely small numbers.</p>
+            <ul>
+                <li><strong>Energy (Barrier & Asymmetry):</strong> Expressed relative to a baseline thermal energy. A barrier of 5.0 means it takes 5 times the baseline thermal energy to cross the transition state.</li>
+                <li><strong>Temperature (T):</strong> If T=1.0, the average thermal energy equals 1 energy unit. If T=5.0, the system is 5 times hotter.</li>
+                <li><strong>Mass (m):</strong> Fixed at 1.0 reduced unit to cleanly demonstrate kinetic behavior across this potential energy surface.</li>
+                <li><strong>Distance (x):</strong> The reaction coordinate is represented in reduced length units (similar to Angstroms).</li>
+            </ul>
+        </div>
+
+        <div class="modal modal-langevin" id="langevinPanel">
+            <button class="close-btn" onclick="document.getElementById('langevinPanel').style.display='none'">&times;</button>
+            <h3>Langevin Dynamics</h3>
+            <p>The movement of each particle is governed by Langevin dynamics, which modifies classical physics to account for an environment filled with a surrounding solvent (like water or honey). The motion you see is a tug-of-war between four factors:</p>
+            <ul>
+                <li><strong>The Landscape (Deterministic Force):</strong> Particles naturally want to roll "downhill" toward the lowest energy state (the products or reactants).</li>
+                <li><strong>The Friction (Viscous Damping):</strong> As the particle moves, the solvent pushes back, causing drag. High damping means the particle moves sluggishly; low damping allows it to coast freely.</li>
+                <li><strong>The Thermal Kicks (Stochastic Noise):</strong> Invisible solvent molecules are constantly bombarding the particle from all directions. This provides the random kicks of energy needed to occasionally push the particle up and over the energy barrier.</li>
+                <li><strong>The Inertia (Mass):</strong> The fundamental tendency of the particle to maintain its current motion, carrying it forward through the solvent.</li>
+            </ul>
+        </div>
+
+        <div>
+            <canvas id="simCanvas" width="600" height="400"></canvas>
+            <div class="legend">
+                <div class="legend-item"><div class="box" style="background: #444;"></div> Potential Energy</div>
+                <div class="legend-item"><div class="box" style="background: rgba(0, 123, 255, 0.15); border: 1px solid #007bff;"></div> Boltzmann Theory</div>
+                <div class="legend-item"><div class="box" style="background: rgba(255, 165, 0, 0.4);"></div> Observed Heat Map</div>
+            </div>
+            <table class="stats-table">
+                <thead>
+                    <tr>
+                        <th>Region (Reactants vs Products)</th>
+                        <th>Current Count</th>
+                        <th>Distribution</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="color: #d63384; font-weight: bold;">Left Well (x < 0)</td>
+                        <td id="countLeft">0</td>
+                        <td id="percentLeft">0%</td>
+                    </tr>
+                    <tr>
+                        <td style="color: #0d6efd; font-weight: bold;">Right Well (x > 0)</td>
+                        <td id="countRight">0</td>
+                        <td id="percentRight">0%</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <label>Particles (N): <span class="val" id="valN">50</span></label>
+                <input type="range" id="paramN" min="1" max="300" value="50">
+            </div>
+            <div class="control-group">
+                <label>Barrier Height: <span class="val" id="valHeight">5.0</span></label>
+                <input type="range" id="paramHeight" min="0" max="25" step="0.5" value="5">
+            </div>
+            <div class="control-group">
+                <label>Asymmetry: <span class="val" id="valAsym">0.0</span></label>
+                <input type="range" id="paramAsym" min="-10" max="10" step="0.5" value="0">
+            </div>
+            <div class="control-group">
+                <label>Temperature (T): <span class="val" id="valT">1.0</span></label>
+                <input type="range" id="paramT" min="0.1" max="20" step="0.1" value="1">
+            </div>
+            <div class="control-group">
+                <label>Damping (γ): <span class="val" id="valGamma">2.0</span></label>
+                <input type="range" id="paramGamma" min="0.2" max="15" step="0.2" value="2.0">
+            </div>
+            <div class="control-group">
+                <label>Sim Speed: <span class="val" id="valSpeed">1.0x</span></label>
+                <input type="range" id="paramSpeed" min="0.1" max="2" step="0.1" value="1">
+            </div>
+
+            <div class="buttons">
+                <button class="btn-play" id="playPauseBtn">Pause Sim</button>
+                <button class="btn-reset" id="resetBtn">Reset Particles</button>
+                <button class="btn-clear" id="clearHeatBtn">Clear Heat Map</button>
+                <button class="btn-info" onclick="document.getElementById('infoPanel').style.display='block'">📖 Units Guide</button>
+                <button class="btn-langevin" onclick="document.getElementById('langevinPanel').style.display='block'">📖 Langevin Eq</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+    const canvas = document.getElementById('simCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let particles = [];
+    let isRunning = true;
+    const dt = 0.005; 
+    const fixedMass = 1.0;
+
+    const numBins = 100;
+    const heatMap = new Array(numBins).fill(0);
+    let maxHeat = 0;
+
+    const config = { n: 50, height: 5.0, asym: 0.0, t: 1.0, gamma: 2.0, speed: 1.0 };
+
+    const setupSlider = (id, key) => {
+        const el = document.getElementById('param' + id);
+        el.oninput = (e) => {
+            const val = parseFloat(e.target.value);
+            config[key] = val;
+            document.getElementById('val' + id).innerText = val + (id === 'Speed' ? 'x' : '');
+            if (id === 'N') resetParticles();
+        };
+    };
+
+    ['N', 'Height', 'Asym', 'T', 'Gamma', 'Speed'].forEach(id => setupSlider(id, id.toLowerCase()));
+
+    document.getElementById('playPauseBtn').onclick = (e) => {
+        isRunning = !isRunning;
+        e.target.innerText = isRunning ? "Resume Sim" : "Pause Sim";
+        e.target.style.background = isRunning ? "#007bff" : "#28a745";
+    };
+
+    document.getElementById('resetBtn').onclick = () => resetParticles();
+    
+    document.getElementById('clearHeatBtn').onclick = () => {
+        heatMap.fill(0);
+        maxHeat = 0;
+    };
+
+    function resetParticles() {
+        particles = [];
+        heatMap.fill(0);
+        maxHeat = 0;
+        for (let i = 0; i < config.n; i++) {
+            particles.push({ x: (Math.random() - 0.5) * 2, v: 0 });
+        }
+    }
+
+    function getV(x) {
+        return config.height * Math.pow(Math.pow(x, 2) - 1, 2) + config.asym * x;
+    }
+
+    function getForce(x) {
+        return -(4 * config.height * x * (x * x - 1) + config.asym);
+    }
+
+    function update() {
+        if (!isRunning) return;
+        const step = dt * config.speed;
+        
+        // Fluctuation-Dissipation Theorem guarantees this relationship:
+        const sigma = Math.sqrt(2 * config.gamma * config.t * step);
+
+        let left = 0, right = 0;
+        for (let p of particles) {
+            const r1 = Math.random(), r2 = Math.random();
+            const rand = Math.sqrt(-2.0 * Math.log(r1 || 1e-6)) * Math.cos(2.0 * Math.PI * r2);
+            
+            const f_ext = getForce(p.x);
+            
+            // Langevin Equation implemented here:
+            const dv = ((f_ext - config.gamma * p.v) / fixedMass) * step + (sigma * rand) / fixedMass;
+            p.v += dv;
+            p.x += p.v * step;
+
+            // Reflective boundaries
+            if (p.x > 2.8) { p.x = 2.8; p.v *= -0.2; }
+            if (p.x < -2.8) { p.x = -2.8; p.v *= -0.2; }
+            if (p.x < 0) left++; else right++;
+
+            const bin = Math.floor(((p.x + 3) / 6) * numBins);
+            if (bin >= 0 && bin < numBins) {
+                heatMap[bin]++;
+                if (heatMap[bin] > maxHeat) maxHeat = heatMap[bin];
+            }
+        }
+        document.getElementById('countLeft').innerText = left;
+        document.getElementById('countRight').innerText = right;
+        document.getElementById('percentLeft').innerText = Math.round((left/config.n)*100) + "%";
+        document.getElementById('percentRight').innerText = Math.round((right/config.n)*100) + "%";
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const scaleX = 100, scaleY = 6;
+        const cX = canvas.width / 2, cY = canvas.height - 80;
+
+        if (maxHeat > 0) {
+            ctx.fillStyle = "rgba(255, 165, 0, 0.4)";
+            const binWidth = (6 * scaleX) / numBins;
+            for (let i = 0; i < numBins; i++) {
+                const h = (heatMap[i] / maxHeat) * 120;
+                const sx = cX + ((i / numBins) * 6 - 3) * scaleX;
+                ctx.fillRect(sx, cY, binWidth, -h);
+            }
+        }
+
+        let z = 0;
+        const points = [];
+        for (let x = -2.5; x <= 2.5; x += 0.02) {
+            const w = Math.exp(-getV(x) / config.t);
+            points.push({x, w});
+            z += w;
+        }
+        ctx.beginPath();
+        ctx.fillStyle = "rgba(0, 123, 255, 0.15)";
+        ctx.strokeStyle = "#007bff";
+        ctx.lineWidth = 1;
+        ctx.moveTo(cX + points[0].x * scaleX, cY);
+        for (let p of points) {
+            const h = (p.w / z) * 800; 
+            ctx.lineTo(cX + p.x * scaleX, cY - h);
+        }
+        ctx.lineTo(cX + points[points.length-1].x * scaleX, cY);
+        ctx.fill(); ctx.stroke();
+
+        ctx.beginPath();
+        ctx.strokeStyle = "#444"; ctx.lineWidth = 3;
+        for (let x = -2.5; x <= 2.5; x += 0.05) {
+            const sy = cY - getV(x) * scaleY;
+            if (x === -2.5) ctx.moveTo(cX + x * scaleX, sy);
+            else ctx.lineTo(cX + x * scaleX, sy);
+        }
+        ctx.stroke();
+
+        particles.forEach(p => {
+            const sx = cX + p.x * scaleX, sy = cY - getV(p.x) * scaleY;
+            ctx.beginPath();
+            ctx.arc(sx, sy - 4, 4, 0, Math.PI * 2);
+            ctx.fillStyle = p.x < 0 ? "#d63384" : "#007bff";
+            ctx.fill();
+            ctx.strokeStyle = "white"; ctx.lineWidth = 1; ctx.stroke();
+        });
+    }
+
+    function loop() { update(); draw(); requestAnimationFrame(loop); }
+    resetParticles();
+    loop();
+</script>
+</body>
+</html>

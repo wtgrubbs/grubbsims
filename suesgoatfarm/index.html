@@ -1,0 +1,1027 @@
+<!doctype html>
+<html lang="en" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sue's Cozy Goat Pasture</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <style>
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap');
+html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; background: #8cd3ff; font-family: 'Nunito', sans-serif; user-select: none; }
+* { box-sizing: border-box; }
+canvas { display: block; }
+#game-wrapper { width: 100%; height: 100%; position: relative; background: #8cd3ff; }
+#gameCanvas { width: 100%; height: 100%; cursor: pointer; }
+
+/* Modern Glassmorphism UI */
+.glass-panel { 
+    background: rgba(255, 255, 255, 0.25); 
+    backdrop-filter: blur(10px); 
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.4); 
+    border-radius: 16px; 
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1); 
+}
+.hud-box { 
+    background: rgba(255, 255, 255, 0.85); 
+    border-radius: 20px; 
+    padding: 8px 16px; 
+    color: #4a5568; 
+    font-size: 16px; 
+    font-weight: 700; 
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    display: flex; align-items: center; gap: 6px;
+}
+#title-screen, #game-over-screen { 
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+    display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; 
+    transition: opacity 0.5s ease;
+}
+#title-screen { background: linear-gradient(135deg, #a1e0ff 0%, #d4f0ff 100%); }
+#game-over-screen { background: rgba(30, 40, 60, 0.85); backdrop-filter: blur(8px); }
+
+.title-text { 
+    font-size: 64px; color: #ff7aa2; 
+    text-shadow: 0 4px 16px rgba(255, 122, 162, 0.3); 
+    font-weight: 900; letter-spacing: -1px; margin-bottom: 8px;
+    text-align: center; line-height: 1.1;
+}
+.subtitle { color: #4a5568; font-size: 22px; font-weight: 700; margin-bottom: 40px; text-align: center;}
+.start-btn { 
+    padding: 16px 48px; background: #ff7aa2; color: #fff; 
+    border: none; border-radius: 30px; font-size: 24px; font-weight: 900; 
+    cursor: pointer; box-shadow: 0 8px 24px rgba(255, 122, 162, 0.4); 
+    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); 
+}
+.start-btn:active { transform: scale(0.92); box-shadow: 0 4px 12px rgba(255, 122, 162, 0.4); }
+.start-btn:hover { background: #ff5c8d; transform: translateY(-3px); }
+
+.controls-text { 
+    margin-top: 40px; padding: 24px; 
+    color:#4a5568; font-size:16px; text-align:center; max-width: 500px; line-height:1.6; 
+}
+.controls-text b { color: #ff7aa2; }
+.message-toast {
+    position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
+    background: rgba(255,255,255,0.95); padding: 12px 24px; border-radius: 30px;
+    color: #4a5568; font-weight: 800; font-size: 18px; box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+    opacity: 0; pointer-events: none; transition: opacity 0.3s, bottom 0.3s;
+}
+</style>
+ </head>
+ <body>
+  <div id="game-wrapper">
+   <canvas id="gameCanvas"></canvas>
+   
+   <div id="hud" style="position:absolute;top:20px;left:20px;right:20px;display:none;pointer-events:none;z-index:10;">
+    <div style="display:flex;justify-content:center;flex-wrap:wrap;gap:12px;">
+     <div class="hud-box" id="hud-time"><span style="font-size:20px">☀️</span> <span id="time-val">8:00 AM</span></div>
+     <div class="hud-box" id="hud-flowers"><span style="font-size:20px">🌷</span> <span id="flower-val">0</span></div>
+     <div class="hud-box" id="hud-goats"><span style="font-size:20px">🐐</span> <span id="goat-val">0</span></div>
+     <div class="hud-box" id="hud-day"><span style="font-size:20px">📅</span> Day <span id="day-val">1</span></div>
+    </div>
+   </div>
+   <div id="toast" class="message-toast"></div>
+
+   <div id="title-screen">
+    <div class="title-text">Sue's Cozy Goat Pasture</div>
+    <div class="subtitle">Gather flowers, explore the woods, and make goat friends.</div>
+    <button class="start-btn" onclick="startGame()">Play Now</button>
+    <div class="glass-panel controls-text">
+     <b>Click anywhere</b> to move smoothly.<br>
+     Use <b>WASD</b> or <b>Arrows</b> for manual control.<br>
+     <b>Spacebar</b> or walk near flowers/goats to interact.<br><br>
+     <i style="color:#64a064">Goats following you when you walk into the barn are saved!</i><br>
+     <i style="color:#ba4040">⚠️ Watch out for wild bears roaming the deeper countrysides!</i>
+    </div>
+   </div>
+
+   <div id="game-over-screen" style="display:none;">
+    <div class="title-text" style="color:#fff; text-shadow: 0 4px 16px rgba(0,0,0,0.5);" id="go-title">Sunset</div>
+    <div style="color:#e2e8f0;font-size:24px;margin-top:20px;font-weight:700;" id="go-message"></div>
+    <div class="glass-panel" style="margin-top:30px; padding: 24px 40px; text-align:center;">
+        <div style="color:#ff7aa2;font-size:28px;font-weight:900;" id="go-score"></div>
+        <div style="color:#4a5568;font-size:18px;margin-top:8px;font-weight:700;" id="go-total"></div>
+    </div>
+    <button class="start-btn" style="margin-top: 40px;" onclick="startGame()">Next Day</button>
+   </div>
+  </div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d', { alpha: false }); 
+const TILE = 60; 
+const DAY_START = 8*60, DAY_END = 19*60;
+const DAY_DURATION_SEC = 180; 
+
+let W, H;
+let gameState = 'title';
+let world, player, goats, flowers, particles, bears;
+let gameTime, realStartTime, dayNum = 0, totalScore = 0;
+let keys = {};
+let targetPos = null;
+let camera = {x:0, y:0};
+let barnX, barnY;
+let audioCtx, masterGain, musicInterval, beatCount = 0;
+let worldW = 80, worldH = 80;
+
+function resizeCanvas() {
+  canvas.width = canvas.parentElement.clientWidth;
+  canvas.height = canvas.parentElement.clientHeight;
+  W = canvas.width; H = canvas.height;
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+// --- MODERN AUDIO SYSTEM ---
+function initAudio() {
+  if (audioCtx) return;
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  audioCtx = new AudioContext();
+  masterGain = audioCtx.createGain();
+  masterGain.gain.value = 0.25;
+  masterGain.connect(audioCtx.destination);
+}
+
+function playSoftTone(freq, dur, type='sine', vol=0.3, slide=null) {
+  if (!audioCtx || audioCtx.state !== 'running') return;
+  const o = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(freq, audioCtx.currentTime);
+  if (slide) o.frequency.exponentialRampToValueAtTime(slide, audioCtx.currentTime + dur);
+  
+  g.gain.setValueAtTime(0, audioCtx.currentTime);
+  g.gain.linearRampToValueAtTime(vol, audioCtx.currentTime + dur*0.1);
+  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+  
+  o.connect(g); g.connect(masterGain);
+  o.start(); o.stop(audioCtx.currentTime + dur);
+}
+
+function playPickup() { 
+  playSoftTone(659.25, 0.2, 'sine', 0.2); 
+  playSoftTone(880.00, 0.4, 'sine', 0.2, 0.1); 
+}
+
+function playGoatFeed() {
+  playSoftTone(523.25, 0.15, 'triangle', 0.2); 
+  setTimeout(()=>playSoftTone(659.25, 0.15, 'triangle', 0.2), 100); 
+  setTimeout(()=>playSoftTone(783.99, 0.3, 'triangle', 0.2), 200); 
+}
+
+function playBleat(baby=false, dist=0) {
+  const maxD = 1000;
+  let vol = Math.max(0.02, 1 - (dist / maxD));
+  vol = vol * vol * 0.4;
+  if (baby) playSoftTone(700, 0.3, 'triangle', vol, 500);
+  else playSoftTone(300, 0.4, 'triangle', vol * 1.5, 200);
+}
+
+function playBearGrowl(dist=0) {
+  const maxD = 900;
+  let vol = Math.max(0.02, 1 - (dist / maxD));
+  vol = vol * vol * 0.6;
+  // Distinctive deeper frequency rumble
+  playSoftTone(95, 0.5, 'sawtooth', vol, 55);
+  setTimeout(() => playSoftTone(80, 0.4, 'sawtooth', vol * 0.8, 45), 140);
+}
+
+const melody = [ 261.63, 329.63, 392.00, 440.00, 392.00, 329.63, null, null ];
+function startAmbient() {
+  stopAmbient();
+  beatCount = 0;
+  musicInterval = setInterval(() => {
+    if (gameState !== 'playing') return;
+    if (beatCount % 4 === 0) playSoftTone(130.81, 1.0, 'sine', 0.15);
+    const note = melody[beatCount % melody.length];
+    if (note && Math.random() > 0.3) {
+        playSoftTone(note, 0.5, 'sine', 0.1);
+        playSoftTone(note*2, 0.5, 'triangle', 0.05);
+    }
+    beatCount++;
+  }, 400); 
+}
+function stopAmbient() { clearInterval(musicInterval); }
+
+// --- PROCEDURAL WORLD GENERATION ---
+const T_GRASS=0, T_WATER=1, T_PATH=2, T_TREE=3, T_BARN=4, T_HILL=5, T_DENSE=6, T_BRIDGE=7, T_TALL_GRASS=8;
+
+function noise2d(x,y,seed) {
+  let n = Math.sin(x*127.1+y*311.7+seed*1731.5)*43758.5453;
+  return n - Math.floor(n);
+}
+
+function smoothNoise(x,y,seed,scale) {
+  const sx=x/scale, sy=y/scale;
+  const ix=Math.floor(sx), iy=Math.floor(sy);
+  const fx=sx-ix, fy=sy-iy;
+  const a=noise2d(ix,iy,seed), b=noise2d(ix+1,iy,seed);
+  const c=noise2d(ix,iy+1,seed), d=noise2d(ix+1,iy+1,seed);
+  const u=fx*fx*(3-2*fx), v=fy*fy*(3-2*fy);
+  return a*(1-u)*(1-v)+b*u*(1-v)+c*(1-u)*v+d*u*v;
+}
+
+function generateWorld() {
+  const seed = dayNum * 1337 + Math.random()*1000;
+  world = [];
+  
+  for (let y=0; y<worldH; y++) {
+    world[y] = [];
+    for (let x=0; x<worldW; x++) {
+      const e = smoothNoise(x,y,seed,12) * 0.5 + smoothNoise(x,y,seed+100,6) * 0.3;
+      const m = smoothNoise(x,y,seed+300,8);
+      const f = smoothNoise(x,y,seed+400,15);
+      
+      if (e < 0.3) world[y][x] = T_WATER;
+      else if (e > 0.75) world[y][x] = T_HILL;
+      else if (f > 0.7 && e > 0.4 && e < 0.6) world[y][x] = T_DENSE;
+      else if (m > 0.65 && e > 0.35) world[y][x] = T_TREE;
+      else if (Math.random() < 0.15) world[y][x] = T_TALL_GRASS;
+      else world[y][x] = T_GRASS;
+    }
+  }
+
+  barnX = Math.floor(worldW/2); barnY = Math.floor(worldH/2);
+
+  for(let dy=-10; dy<=10; dy++) {
+      for(let dx=-10; dx<=10; dx++) {
+          const x = barnX+dx, y = barnY+dy;
+          if(x>=0 && x<worldW && y>=0 && y<worldH) {
+              if (world[y][x] === T_TREE || world[y][x] === T_DENSE || world[y][x] === T_WATER) {
+                  world[y][x] = T_GRASS;
+              }
+          }
+      }
+  }
+
+  for (let i=-35; i<35; i++) {
+      if (barnX+i>=0 && barnX+i<worldW) setTile(barnX+i, barnY+4, T_PATH);
+      if (barnX+i>=0 && barnX+i<worldW) setTile(barnX+i, barnY+5, T_PATH);
+      if (barnY+i>=0 && barnY+i<worldH) setTile(barnX+4, barnY+i, T_PATH);
+      if (barnY+i>=0 && barnY+i<worldH) setTile(barnX+5, barnY+i, T_PATH);
+  }
+  
+  for (let d=0; d<4; d++) {
+     let px=barnX, py=barnY;
+     const ang = d*Math.PI/2 + (Math.random()-0.5)*0.3;
+     for (let s=0; s<40; s++) {
+         px += Math.round(Math.cos(ang) + (Math.random()-0.5)*0.5);
+         py += Math.round(Math.sin(ang) + (Math.random()-0.5)*0.5);
+         if (px>=0&&px<worldW&&py>=0&&py<worldH) setTile(px, py, T_PATH);
+     }
+  }
+
+  for (let dy=-4;dy<=3;dy++) {
+      for (let dx=-5;dx<=6;dx++) {
+          world[barnY+dy][barnX+dx] = T_BARN;
+      }
+  }
+}
+
+function setTile(x, y, t) {
+    if (x<0 || x>=worldW || y<0 || y>=worldH) return;
+    if (world[y][x] === T_WATER && t === T_PATH) world[y][x] = T_BRIDGE;
+    else if (world[y][x] !== T_BARN) world[y][x] = t;
+}
+
+function getTileAt(x, y) {
+    const tx = Math.floor(x/TILE), ty = Math.floor(y/TILE);
+    if(tx<0||tx>=worldW||ty<0||ty>=worldH) return T_WATER;
+    return world[ty][tx];
+}
+
+function isSolidPoint(px, py) {
+    return getTileAt(px, py) === T_WATER;
+}
+
+// --- ENTITIES & PARTICLES ---
+function spawnEntities() {
+  flowers = []; goats = []; particles = []; bears = [];
+  
+  for (let i=0; i<80; i++) {
+    let fx, fy, tries = 0;
+    do { 
+        fx=Math.floor(Math.random()*worldW); fy=Math.floor(Math.random()*worldH); tries++;
+    } while (tries < 100 && (isSolidPoint(fx*TILE+TILE/2, fy*TILE+TILE/2) || (Math.abs(fx-barnX)<8&&Math.abs(fy-barnY)<8)));
+    
+    if (tries < 100) {
+        const colors = ['#ff7aa2', '#ffd166', '#a0c4ff'];
+        flowers.push({ x: fx*TILE+TILE/2, y: fy*TILE+TILE/2, color: colors[Math.floor(Math.random()*3)], collected: false, floatOff: Math.random()*Math.PI*2 });
+    }
+  }
+
+  for (let i=0; i<25; i++) {
+    let gx, gy, tries = 0;
+    do { 
+        gx=Math.floor(Math.random()*worldW); gy=Math.floor(Math.random()*worldH); tries++;
+    } while (tries < 100 && (isSolidPoint(gx*TILE+TILE/2, gy*TILE+TILE/2) || (Math.abs(gx-barnX)<12&&Math.abs(gy-barnY)<12)));
+    
+    if (tries < 100) {
+        const isMother = Math.random() < 0.4;
+        const baseG = { x: gx*TILE+TILE/2, y: gy*TILE+TILE/2, following: false, isBaby: false, isMother: isMother, tx: gx*TILE+TILE/2, ty: gy*TILE+TILE/2, jumpY: 0, time: Math.random()*100 };
+        goats.push(baseG);
+        
+        if (isMother) {
+            goats.push({ x: baseG.x+20, y: baseG.y+20, following: false, isBaby: true, parentIdx: goats.length-1, tx: baseG.x+20, ty: baseG.y+20, jumpY: 0, time: Math.random()*100 });
+        }
+    }
+  }
+
+  // Bears spawn much less frequently than goats
+  for (let i=0; i<4; i++) {
+    let bx, by, tries = 0;
+    do { 
+        bx=Math.floor(Math.random()*worldW); by=Math.floor(Math.random()*worldH); tries++;
+    } while (tries < 100 && (isSolidPoint(bx*TILE+TILE/2, by*TILE+TILE/2) || (Math.abs(bx-barnX)<15&&Math.abs(by-barnY)<15)));
+    
+    if (tries < 100) {
+        bears.push({ x: bx*TILE+TILE/2, y: by*TILE+TILE/2, tx: bx*TILE+TILE/2, ty: by*TILE+TILE/2, jumpY: 0, time: Math.random()*100, growlCooldown: 0 });
+    }
+  }
+}
+
+function spawnParticle(x, y, color, type='circle') {
+    particles.push({
+        x: x, y: y,
+        vx: (Math.random()-0.5)*4, vy: (Math.random()-0.5)*4 - 2,
+        life: 1.0, color: color, type: type
+    });
+}
+
+function initPlayer() {
+  player = { x: barnX*TILE+TILE/2, y: (barnY+5)*TILE, vx: 0, vy: 0, flowerCount: 0, jumpY: 0, time: 0 };
+}
+
+// --- INPUT ---
+document.addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; if(e.key===' ')e.preventDefault(); });
+document.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+canvas.addEventListener('pointerdown', e => {
+  if (gameState !== 'playing') return;
+  const rect = canvas.getBoundingClientRect();
+  targetPos = { x: e.clientX - rect.left + camera.x, y: e.clientY - rect.top + camera.y };
+  spawnParticle(targetPos.x, targetPos.y, 'rgba(255,255,255,0.8)');
+});
+
+// --- GAME LOGIC ---
+function startGame() {
+  initAudio();
+  if(audioCtx.state === 'suspended') audioCtx.resume();
+  document.getElementById('title-screen').style.opacity = '0';
+  setTimeout(()=>document.getElementById('title-screen').style.display='none', 500);
+  document.getElementById('game-over-screen').style.display = 'none';
+  document.getElementById('hud').style.display = 'block';
+  
+  // Clean up any lingering bear dynamic layout updates
+  const goScreen = document.getElementById('game-over-screen');
+  goScreen.style.background = 'rgba(30, 40, 60, 0.85)';
+  document.getElementById('go-title').style.color = '#fff';
+  document.getElementById('go-title').style.textShadow = '0 4px 16px rgba(0,0,0,0.5)';
+  document.getElementById('go-score').style.color = '#ff7aa2';
+  const goBtn = goScreen.querySelector('.start-btn');
+  goBtn.textContent = 'Next Day';
+  goBtn.style.background = '#ff7aa2';
+  goBtn.style.boxShadow = '0 8px 24px rgba(255, 122, 162, 0.4)';
+
+  dayNum++;
+  generateWorld();
+  spawnEntities();
+  initPlayer();
+  targetPos = null;
+  keys = {};
+  gameTime = DAY_START;
+  realStartTime = performance.now();
+  gameState = 'playing';
+  startAmbient();
+}
+
+function getGameMinutes() {
+  const elapsed = (performance.now() - realStartTime) / 1000;
+  return DAY_START + (elapsed / DAY_DURATION_SEC) * (DAY_END - DAY_START);
+}
+
+function formatTime(mins) {
+  let h = Math.floor(mins/60), m = Math.floor(mins%60);
+  let ampm = h>=12?'PM':'AM';
+  h = h>12?h-12:(h===0?12:h);
+  return `${h}:${m<10?'0'+m:m} ${ampm}`;
+}
+
+function showToast(txt) {
+  const el = document.getElementById('toast');
+  el.textContent = txt; 
+  el.style.opacity = 1; el.style.bottom = '60px';
+  clearTimeout(el.to);
+  el.to = setTimeout(() => { el.style.opacity = 0; el.style.bottom = '40px'; }, 2500);
+}
+
+function triggerBearGameOver() {
+  gameState = 'gameover';
+  stopAmbient();
+  
+  // Low forbidding game over rumble sound
+  playSoftTone(60, 1.2, 'sawtooth', 0.6, 25);
+  
+  const el = document.getElementById('game-over-screen');
+  el.style.display = 'flex';
+  el.style.background = 'linear-gradient(135deg, #120202 0%, #290505 100%)'; 
+  document.getElementById('hud').style.display = 'none';
+  
+  document.getElementById('go-title').innerHTML = '☠️ DANGER ☠️';
+  document.getElementById('go-title').style.color = '#ff3838';
+  document.getElementById('go-title').style.textShadow = '0 0 20px #ff0000';
+  
+  document.getElementById('go-message').innerHTML = `
+    <div class="flex flex-col items-center gap-2">
+      <div style="font-size:36px; letter-spacing: 6px; margin-bottom: 8px;">🚑 &nbsp; ☠️ &nbsp; 🚑</div>
+      <div class="text-red-500 font-extrabold text-2xl tracking-wide uppercase">Don't feed the bears!</div>
+      <div class="text-gray-400 text-sm italic">Bears are not your farm friends. They prefer to stay wild.</div>
+      <div style="font-size:36px; letter-spacing: 6px; margin-top: 8px;">☠️ &nbsp; 🚑 &nbsp; ☠️</div>
+    </div>
+  `;
+  
+  document.getElementById('go-score').textContent = '0 Points Today';
+  document.getElementById('go-score').style.color = '#ff4444';
+  document.getElementById('go-total').textContent = `Total Harmony Score: ${totalScore}`;
+  
+  const btn = el.querySelector('.start-btn');
+  btn.textContent = 'Try Again';
+  btn.style.background = '#e53e3e';
+  btn.style.boxShadow = '0 8px 24px rgba(229, 62, 62, 0.5)';
+}
+
+function update() {
+  if (gameState !== 'playing') return;
+  gameTime = getGameMinutes();
+  if (gameTime >= DAY_END) { endDay(false); return; }
+
+  let ax=0, ay=0;
+  if (keys['arrowleft']||keys['a']) { ax=-1; targetPos=null; }
+  if (keys['arrowright']||keys['d']) { ax=1; targetPos=null; }
+  if (keys['arrowup']||keys['w']) { ay=-1; targetPos=null; }
+  if (keys['arrowdown']||keys['s']) { ay=1; targetPos=null; }
+  
+  const currentTile = getTileAt(player.x, player.y);
+  let terrainAccel = 0.8;
+  let maxVelocity = 4.0;
+  
+  if (currentTile === T_PATH || currentTile === T_BRIDGE || currentTile === T_BARN) {
+      terrainAccel = 1.0;  
+      maxVelocity = 5.0;
+  } else if (currentTile === T_TREE || currentTile === T_DENSE) {
+      terrainAccel = 0.3;  
+      maxVelocity = 1.5;
+  } else {
+      terrainAccel = 0.7;  
+      maxVelocity = 3.5;
+  }
+
+  if (targetPos) {
+      const dx = targetPos.x - player.x, dy = targetPos.y - player.y;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      if (dist > maxVelocity) { ax = dx/dist; ay = dy/dist; } 
+      else { targetPos = null; }
+  }
+
+  player.vx += ax * terrainAccel; player.vy += ay * terrainAccel;
+  player.vx *= 0.8; player.vy *= 0.8; 
+
+  const nextX = player.x + player.vx;
+  const nextY = player.y + player.vy;
+  
+  let movedX = false, movedY = false;
+  const colRad = 18; 
+
+  // --- REFINED 4-CORNER BOUNDING BOX COLLISION DETECTOR (FIXES GLITCH) ---
+  function canPassThrough(nx, ny) {
+      return !isSolidPoint(nx - colRad, ny - colRad) &&
+             !isSolidPoint(nx + colRad, ny - colRad) &&
+             !isSolidPoint(nx - colRad, ny + colRad) &&
+             !isSolidPoint(nx + colRad, ny + colRad);
+  }
+
+  if (canPassThrough(nextX, player.y)) {
+      player.x = nextX; movedX = true;
+  } else { player.vx *= 0.2; }
+  
+  if (canPassThrough(player.x, nextY)) {
+      player.y = nextY; movedY = true;
+  } else { player.vy *= 0.2; }
+
+  if (targetPos && !movedX && !movedY && Math.abs(ax)>0) {
+      targetPos = null;
+  }
+
+  const currentSpeed = Math.sqrt(player.vx*player.vx + player.vy*player.vy);
+  if (currentSpeed > 0.1) {
+      player.time += currentSpeed * 0.05; 
+      player.jumpY = Math.abs(Math.sin(player.time)) * -8;
+      if (Math.random() < currentSpeed * 0.02) spawnParticle(player.x, player.y+10, 'rgba(200,180,150,0.5)'); 
+  } else {
+      player.jumpY += (0 - player.jumpY) * 0.2; 
+  }
+
+  camera.x += (player.x - W/2 - camera.x) * 0.08;
+  camera.y += (player.y - H/2 - camera.y) * 0.08;
+
+  const interactRadius = 80;
+  const interact = keys[' '] || keys['e'];
+  if (interact) { keys[' ']=false; keys['e']=false; }
+
+  for (const f of flowers) {
+    if (!f.collected && Math.abs(player.x-f.x) < interactRadius && Math.abs(player.y-f.y) < interactRadius) {
+      f.collected = true; player.flowerCount++;
+      playPickup();
+      for(let i=0;i<5;i++) spawnParticle(f.x, f.y, f.color);
+      showToast(`Gathered a flower!`);
+    }
+  }
+
+  // --- BEARS ACTION LOOP ---
+  for (const b of bears) {
+    b.time += 0.04;
+    if (b.growlCooldown > 0) b.growlCooldown--;
+
+    // Bears roam randomly around the scenery
+    if (Math.random() < 0.008) {
+        b.tx = b.x + (Math.random()-0.5)*160;
+        b.ty = b.y + (Math.random()-0.5)*160;
+    }
+    const dx = b.tx - b.x, dy = b.ty - b.y;
+    if (Math.abs(dx)>5 || Math.abs(dy)>5) {
+        const nextBx = b.x + dx*0.012, nextBy = b.y + dy*0.012;
+        if (!isSolidPoint(nextBx, nextBy)) {
+            b.x = nextBx; b.y = nextBy;
+            b.jumpY = Math.abs(Math.sin(b.time)) * -3;
+        } else { b.tx = b.x; b.ty = b.y; }
+    } else { b.jumpY *= 0.8; }
+
+    const distToPlayer = Math.sqrt((b.x - player.x)**2 + (b.y - player.y)**2);
+
+    // Audio warning growl if nearby
+    if (distToPlayer < 380 && b.growlCooldown === 0 && Math.random() < 0.012) {
+        playBearGrowl(distToPlayer);
+        b.growlCooldown = 280; // cooldown interval
+        spawnParticle(b.x, b.y - 20, '#e53e3e', 'growl');
+    }
+
+    // Checking feeding rule configuration
+    if (distToPlayer < interactRadius) {
+        if (player.flowerCount > 0) {
+            triggerBearGameOver();
+            return; // Exit game loop instantly
+        } else if (Math.random() < 0.02) {
+            spawnParticle(b.x, b.y - 15, '#dd6b20', 'question');
+        }
+    }
+  }
+
+  // --- GOATS ACTION LOOP ---
+  for (let i=0; i<goats.length; i++) {
+    const g = goats[i];
+    g.time += 0.1;
+
+    if (g.following) {
+        let leaderX, leaderY;
+        if (g.isBaby) {
+            const mom = goats[g.parentIdx];
+            leaderX = mom.x + Math.cos(g.time)*15;
+            leaderY = mom.y + Math.sin(g.time)*15;
+        } else {
+            let rank = goats.filter(og => og.following).indexOf(g);
+            if (rank === 0) { leaderX = player.x; leaderY = player.y; }
+            else { 
+                const ahead = goats.filter(og => og.following)[rank-1];
+                leaderX = ahead.x; leaderY = ahead.y;
+            }
+        }
+        
+        const dx = leaderX - g.x, dy = leaderY - g.y;
+        const dist = Math.sqrt(dx*dx+dy*dy);
+        if (dist > 55) {
+            g.x += dx * 0.05; g.y += dy * 0.05;
+            g.jumpY = Math.abs(Math.sin(g.time*1.5)) * (g.isBaby?-4:-6);
+            if(Math.random()<0.05) spawnParticle(g.x, g.y+8, 'rgba(200,180,150,0.3)');
+        } else { g.jumpY *= 0.8; }
+    } else {
+        if (Math.random() < 0.01) {
+            g.tx = g.x + (Math.random()-0.5)*120;
+            g.ty = g.y + (Math.random()-0.5)*120;
+        }
+        const dx = g.tx - g.x, dy = g.ty - g.y;
+        if (Math.abs(dx)>5 || Math.abs(dy)>5) {
+            const nextGx = g.x + dx*0.02, nextGy = g.y + dy*0.02;
+            if (!isSolidPoint(nextGx, nextGy)) {
+                g.x = nextGx; g.y = nextGy;
+                g.jumpY = Math.abs(Math.sin(g.time)) * (g.isBaby?-3:-5);
+            } else { g.tx = g.x; g.ty = g.y; }
+        } else { g.jumpY *= 0.8; }
+
+        if (Math.abs(player.x-g.x) < interactRadius && Math.abs(player.y-g.y) < interactRadius) {
+            if (player.flowerCount > 0 && !g.isBaby) {
+                player.flowerCount--;
+                g.following = true;
+                playGoatFeed();
+                for(let k=0; k<5; k++) spawnParticle(g.x, g.y-20, '#ff477e', 'heart');
+                
+                if(g.isMother) {
+                    goats.forEach(bg => { 
+                        if(bg.isBaby && bg.parentIdx === i) {
+                            bg.following = true; 
+                            for(let k=0; k<3; k++) spawnParticle(bg.x, bg.y-10, '#ff477e', 'heart');
+                        }
+                    });
+                    showToast('A mama goat & babies joined!');
+                } else {
+                    showToast('A goat joined your flock!');
+                }
+            } else if (!g.isBaby && player.flowerCount === 0 && Math.random()<0.03) {
+                spawnParticle(g.x, g.y-10, '#a0c4ff', 'question');
+            }
+        }
+    }
+
+    if (Math.random() < 0.002) {
+        const distToPlayer = Math.sqrt((g.x-player.x)**2+(g.y-player.y)**2);
+        if (distToPlayer < 1000) playBleat(g.isBaby, distToPlayer);
+    }
+  }
+
+  for (let i=particles.length-1; i>=0; i--) {
+      let p = particles[i];
+      p.x += p.vx; p.y += p.vy;
+      if (p.type === 'heart' || p.type === 'question') p.vy -= 0.1; 
+      p.life -= 0.03;
+      if (p.life <= 0) particles.splice(i, 1);
+  }
+
+  const doorX = barnX*TILE + 60;
+  const doorY = barnY*TILE + 80;
+  const isNearBarnDoor = Math.abs(player.x - doorX) < 60 && Math.abs(player.y - doorY) < 60;
+  
+  if (isNearBarnDoor) {
+      endDay(true);
+  }
+
+  document.getElementById('time-val').textContent = formatTime(gameTime);
+  document.getElementById('flower-val').textContent = player.flowerCount;
+  document.getElementById('goat-val').textContent = goats.filter(g=>g.following).length;
+  document.getElementById('day-val').textContent = dayNum;
+}
+
+function endDay(survived) {
+  gameState = 'gameover';
+  stopAmbient();
+  let pts = player.flowerCount; 
+  let banked = 0;
+  
+  if (survived) {
+    playGoatFeed(); playGoatFeed(); 
+    for (const g of goats) {
+        if (g.following) {
+            banked++;
+            if (!g.isBaby) pts += g.isMother ? 15 : 5;
+        }
+    }
+  }
+  
+  const el = document.getElementById('game-over-screen');
+  el.style.display = 'flex';
+  document.getElementById('hud').style.display = 'none';
+  
+  document.getElementById('go-title').textContent = survived ? 'Home Sweet Home' : 'Fell Asleep Outside';
+  document.getElementById('go-message').textContent = survived ? (banked > 0 ? `You safely brought ${banked} goats home!` : 'You came back to rest.') : "You didn't make it back before dark.";
+  
+  totalScore += pts;
+  document.getElementById('go-score').textContent = `+${pts} Points Today`;
+  document.getElementById('go-total').textContent = `Total Harmony Score: ${totalScore}`;
+}
+
+// --- RENDERING ---
+function render() {
+  if (gameState !== 'playing') { requestAnimationFrame(render); return; }
+
+  ctx.fillStyle = '#8bd468';
+  ctx.fillRect(0,0,W,H);
+
+  const startTX = Math.floor(camera.x/TILE) - 1;
+  const startTY = Math.floor(camera.y/TILE) - 1;
+  const endTX = startTX + Math.ceil(W/TILE) + 2;
+  const endTY = startTY + Math.ceil(H/TILE) + 2;
+
+  for (let y=startTY; y<endTY; y++) {
+    for (let x=startTX; x<endTX; x++) {
+      let t = T_TREE;
+      if(x>=0 && x<worldW && y>=0 && y<worldH) {
+          t = world[y][x];
+      }
+
+      const sx = x*TILE - camera.x;
+      const sy = y*TILE - camera.y;
+
+      if (t === T_WATER) {
+          ctx.fillStyle = '#6ebcf2';
+          ctx.fillRect(sx, sy, TILE+1, TILE+1);
+          ctx.fillStyle = '#9bd4ff';
+          if ((x+y)%2===0) { ctx.beginPath(); ctx.arc(sx+TILE/2, sy+TILE/2, TILE*0.3, 0, Math.PI*2); ctx.fill(); }
+      } else if (t === T_PATH) {
+          ctx.fillStyle = '#e0c58d';
+          ctx.fillRect(sx, sy, TILE+1, TILE+1);
+      } else if (t === T_HILL) {
+          ctx.fillStyle = '#9c815c'; 
+          ctx.fillRect(sx, sy, TILE+1, TILE+1);
+          ctx.fillStyle = '#bfa57e'; 
+          ctx.fillRect(sx, sy, TILE+1, TILE-10);
+      } else if (t === T_BRIDGE) {
+          ctx.fillStyle = '#6ebcf2';
+          ctx.fillRect(sx, sy, TILE+1, TILE+1);
+          ctx.fillStyle = '#a67d58';
+          ctx.beginPath(); ctx.roundRect(sx+2, sy+8, TILE-4, 12, 4); ctx.fill();
+          ctx.beginPath(); ctx.roundRect(sx+2, sy+28, TILE-4, 12, 4); ctx.fill();
+          ctx.beginPath(); ctx.roundRect(sx+2, sy+48, TILE-4, 12, 4); ctx.fill();
+      } else if (t === T_BARN) {
+          ctx.fillStyle = '#d1bfae';
+          ctx.fillRect(sx, sy, TILE+1, TILE+1);
+      } else if (t === T_TALL_GRASS) {
+          ctx.fillStyle = '#9ad973';
+          ctx.beginPath(); ctx.arc(sx+TILE/2, sy+TILE/2 + 10, 8, Math.PI, 0); ctx.fill();
+          ctx.beginPath(); ctx.arc(sx+TILE/2 - 10, sy+TILE/2 + 5, 6, Math.PI, 0); ctx.fill();
+          ctx.beginPath(); ctx.arc(sx+TILE/2 + 10, sy+TILE/2 + 5, 6, Math.PI, 0); ctx.fill();
+      }
+    }
+  }
+
+  const bx = barnX*TILE - camera.x;
+  const by = barnY*TILE - camera.y;
+  if (bx > -200 && bx < W+200 && by > -200 && by < H+200) {
+      ctx.fillStyle = '#ff5c5c'; 
+      ctx.beginPath(); ctx.roundRect(bx-20, by-30, 160, 140, 16); ctx.fill();
+      ctx.fillStyle = '#ff7a7a'; 
+      ctx.beginPath(); ctx.roundRect(bx-20, by-30, 160, 12, {tl: 16, tr: 16}); ctx.fill();
+      ctx.fillStyle = '#4a4a4a';
+      ctx.beginPath(); ctx.moveTo(bx-40, by-10); ctx.lineTo(bx+60, by-80); ctx.lineTo(bx+160, by-10); ctx.fill();
+      
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.roundRect(bx+40, by+50, 40, 60, {tl: 10, tr: 10}); ctx.fill();
+      ctx.fillStyle = '#333';
+      ctx.beginPath(); ctx.roundRect(bx+44, by+54, 32, 56, {tl: 6, tr: 6}); ctx.fill();
+      
+      ctx.fillStyle = `rgba(255,255,255,${0.5 + Math.sin(performance.now()*0.005)*0.5})`;
+      ctx.font = '700 14px Nunito'; ctx.textAlign = 'center';
+      
+      ctx.fillText("Walk here to enter", bx+60, by-90);
+  }
+
+  for (const f of flowers) {
+      if (f.collected) continue;
+      const sx = f.x - camera.x, sy = f.y - camera.y;
+      if(sx<-20||sx>W+20||sy<-20||sy>H+20) continue;
+      
+      const sway = Math.sin(performance.now()*0.002 + f.floatOff)*3;
+      ctx.fillStyle = '#4caf50'; ctx.fillRect(sx-2+sway, sy, 4, 12); 
+      ctx.fillStyle = f.color;
+      ctx.beginPath(); ctx.arc(sx+sway, sy-4, 8, 0, Math.PI*2); ctx.fill(); 
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(sx-2+sway, sy-6, 3, 0, Math.PI*2); ctx.fill(); 
+  }
+
+  let renderItems = [];
+  renderItems.push({type: 'player', y: player.y, obj: player});
+  for (const g of goats) renderItems.push({type: 'goat', y: g.y, obj: g});
+  for (const b of bears) renderItems.push({type: 'bear', y: b.y, obj: b});
+  
+  for (let y=startTY; y<endTY; y++) {
+    for (let x=startTX; x<endTX; x++) {
+      let t = T_TREE;
+      if(x>=0 && x<worldW && y>=0 && y<worldH) {
+          t = world[y][x];
+      }
+      
+      if (t === T_TREE || t === T_DENSE) {
+          renderItems.push({type: t === T_TREE ? 'tree' : 'dense', y: y*TILE + TILE/2, x: x*TILE + TILE/2});
+      }
+    }
+  }
+  
+  renderItems.sort((a,b) => a.y - b.y);
+
+  for (const item of renderItems) {
+      if (item.type === 'tree') {
+          const sx = item.x - camera.x, sy = item.y - camera.y;
+          ctx.fillStyle = 'rgba(0,0,0,0.15)'; 
+          ctx.beginPath(); ctx.ellipse(sx, sy+20, 24, 10, 0, 0, Math.PI*2); ctx.fill();
+          ctx.fillStyle = '#795548'; ctx.fillRect(sx-6, sy-10, 12, 34); 
+          ctx.fillStyle = '#2e7d32'; 
+          ctx.beginPath(); ctx.arc(sx-15, sy-20, 25, 0, Math.PI*2); ctx.fill();
+          ctx.beginPath(); ctx.arc(sx+15, sy-20, 25, 0, Math.PI*2); ctx.fill();
+          ctx.fillStyle = '#43a047'; 
+          ctx.beginPath(); ctx.arc(sx, sy-35, 30, 0, Math.PI*2); ctx.fill();
+          ctx.fillStyle = '#66bb6a'; 
+          ctx.beginPath(); ctx.arc(sx-8, sy-45, 12, 0, Math.PI*2); ctx.fill();
+      }
+      else if (item.type === 'dense') {
+          const sx = item.x - camera.x, sy = item.y - camera.y;
+          ctx.fillStyle = 'rgba(0,0,0,0.1)'; 
+          ctx.beginPath(); ctx.ellipse(sx, sy+15, 30, 12, 0, 0, Math.PI*2); ctx.fill();
+          ctx.fillStyle = '#1b5e20'; 
+          ctx.beginPath(); ctx.arc(sx-15, sy, 22, 0, Math.PI*2); ctx.fill();
+          ctx.beginPath(); ctx.arc(sx+15, sy, 22, 0, Math.PI*2); ctx.fill();
+          ctx.fillStyle = '#2e7d32'; 
+          ctx.beginPath(); ctx.arc(sx, sy-10, 26, 0, Math.PI*2); ctx.fill();
+      }
+      else if (item.type === 'bear') {
+          const b = item.obj;
+          const sx = b.x - camera.x, sy = b.y + b.jumpY - camera.y;
+          
+          ctx.fillStyle = 'rgba(0,0,0,0.22)';
+          ctx.beginPath(); ctx.ellipse(sx, b.y - camera.y + 14, 24, 9, 0, 0, Math.PI*2); ctx.fill();
+
+          // Cartoon Bear Build (Grizzly brown tone)
+          ctx.fillStyle = '#54361a';
+          ctx.beginPath(); ctx.roundRect(sx-22, sy-16, 44, 32, 14); ctx.fill(); // Torso
+          ctx.beginPath(); ctx.arc(sx-15, sy-6, 13, 0, Math.PI*2); ctx.fill(); // Head
+          
+          // Round ears
+          ctx.beginPath(); ctx.arc(sx-24, sy-16, 4.5, 0, Math.PI*2); ctx.fill();
+          ctx.beginPath(); ctx.arc(sx-8, sy-16, 4.5, 0, Math.PI*2); ctx.fill();
+          
+          // Snout details
+          ctx.fillStyle = '#7a542f';
+          ctx.beginPath(); ctx.arc(sx-19, sy-4, 5.5, 0, Math.PI*2); ctx.fill();
+          ctx.fillStyle = '#111';
+          ctx.beginPath(); ctx.arc(sx-20, sy-5, 2, 0, Math.PI*2); ctx.fill(); // Nose
+          
+          // Beady small eye
+          ctx.fillStyle = '#fff';
+          ctx.beginPath(); ctx.arc(sx-11, sy-8, 2, 0, Math.PI*2); ctx.fill();
+          ctx.fillStyle = '#000';
+          ctx.beginPath(); ctx.arc(sx-11, sy-8, 1, 0, Math.PI*2); ctx.fill();
+          
+          // Darker legs
+          ctx.fillStyle = '#3a230e';
+          ctx.fillRect(sx-17, sy+12, 6, 8); ctx.fillRect(sx+7, sy+12, 6, 8);
+      }
+      else if (item.type === 'goat') {
+          const g = item.obj;
+          const sx = g.x - camera.x, sy = g.y + g.jumpY - camera.y;
+          const s = g.isBaby ? 0.6 : 1.0;
+          
+          ctx.fillStyle = 'rgba(0,0,0,0.15)';
+          ctx.beginPath(); ctx.ellipse(sx, g.y - camera.y + 12*s, 16*s, 6*s, 0, 0, Math.PI*2); ctx.fill();
+
+          ctx.fillStyle = g.isBaby ? '#fffef2' : '#f5eedc';
+          ctx.beginPath(); ctx.roundRect(sx-16*s, sy-12*s, 32*s, 24*s, 12*s); ctx.fill();
+          
+          ctx.fillStyle = '#333';
+          ctx.beginPath(); ctx.arc(sx-8*s, sy-2*s, 2.5*s, 0, Math.PI*2); ctx.fill();
+          ctx.beginPath(); ctx.arc(sx-2*s, sy-2*s, 2.5*s, 0, Math.PI*2); ctx.fill();
+          ctx.fillStyle = '#ffb3c6'; 
+          ctx.beginPath(); ctx.arc(sx-11*s, sy+2*s, 3*s, 0, Math.PI*2); ctx.fill();
+          
+          ctx.fillStyle = '#d4c3a3';
+          if (!g.isBaby) {
+              ctx.fillRect(sx-12, sy-20, 3, 8); ctx.fillRect(sx-4, sy-20, 3, 8); 
+          }
+          ctx.beginPath(); ctx.arc(sx+4*s, sy-6*s, 6*s, 0, Math.PI*2); ctx.fill(); 
+          
+          ctx.fillStyle = '#b5a588';
+          ctx.fillRect(sx-10*s, sy+10*s, 4*s, 6*s); ctx.fillRect(sx+6*s, sy+10*s, 4*s, 6*s);
+      }
+      else if (item.type === 'player') {
+          const sx = player.x - camera.x, sy = player.y + player.jumpY - camera.y;
+          
+          ctx.fillStyle = 'rgba(0,0,0,0.15)';
+          ctx.beginPath(); ctx.ellipse(sx, player.y - camera.y + 16, 14, 6, 0, 0, Math.PI*2); ctx.fill();
+
+          ctx.fillStyle = '#5c8aff'; 
+          ctx.beginPath(); ctx.roundRect(sx-10, sy-2, 20, 16, 8); ctx.fill();
+          ctx.fillStyle = '#ff7aa2'; 
+          ctx.beginPath(); ctx.roundRect(sx-10, sy-8, 20, 10, {tl: 8, tr: 8}); ctx.fill();
+          
+          ctx.fillStyle = '#ffd1a8'; 
+          ctx.beginPath(); ctx.arc(sx, sy-16, 12, 0, Math.PI*2); ctx.fill();
+          ctx.fillStyle = '#f0c05a'; 
+          ctx.beginPath(); ctx.arc(sx, sy-20, 14, Math.PI, 0); ctx.fill(); 
+          ctx.beginPath(); ctx.roundRect(sx-14, sy-20, 6, 20, 4); ctx.fill(); 
+          ctx.beginPath(); ctx.roundRect(sx+8, sy-20, 6, 20, 4); ctx.fill(); 
+          
+          ctx.fillStyle = '#333';
+          ctx.beginPath(); ctx.arc(sx-4, sy-14, 2, 0, Math.PI*2); ctx.fill();
+          ctx.beginPath(); ctx.arc(sx+4, sy-14, 2, 0, Math.PI*2); ctx.fill();
+          ctx.fillStyle = '#ff9999'; ctx.beginPath(); ctx.arc(sx-6, sy-10, 2.5, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(sx+6, sy-10, 2.5, 0, Math.PI*2); ctx.fill();
+          
+          ctx.fillStyle = '#a66b42'; 
+          ctx.fillRect(sx-8, sy+14, 6, 6); ctx.fillRect(sx+2, sy+14, 6, 6);
+      }
+  }
+
+  for (const p of particles) {
+      const sx = p.x - camera.x, sy = p.y - camera.y;
+      ctx.globalAlpha = p.life;
+      ctx.fillStyle = p.color;
+      if (p.type === 'circle') {
+          ctx.beginPath(); ctx.arc(sx, sy, 4, 0, Math.PI*2); ctx.fill();
+      } else if (p.type === 'heart') {
+          ctx.font = '20px Arial'; ctx.fillText('❤️', sx-10, sy+10);
+      } else if (p.type === 'question') {
+          ctx.font = '20px Nunito'; ctx.fillStyle = '#fff'; ctx.fillText('?', sx-5, sy+10);
+      } else if (p.type === 'growl') {
+          ctx.font = 'bold 13px Nunito'; ctx.fillStyle = '#ff2222'; ctx.fillText('GRRR!', sx-16, sy);
+      }
+      ctx.globalAlpha = 1.0;
+  }
+
+  const timeProgress = (gameTime - DAY_START) / (DAY_END - DAY_START);
+  if (timeProgress > 0.7) {
+      const sunsetIntensity = Math.min(0.5, (timeProgress - 0.7) * 2);
+      ctx.fillStyle = `rgba(255, 120, 80, ${sunsetIntensity * 0.4})`;
+      ctx.fillRect(0,0,W,H); 
+      ctx.fillStyle = `rgba(30, 20, 60, ${sunsetIntensity * 0.6})`;
+      ctx.fillRect(0,0,W,H); 
+  }
+
+  // --- DYNAMIC HUD GLASS MINI MAP (BOTTOM RIGHT) ---
+  const mmSize = 140;
+  const mmX = W - mmSize - 20;
+  const mmY = H - mmSize - 20;
+  const wTotalW = worldW * TILE;
+  const wTotalH = worldH * TILE;
+
+  ctx.save();
+  // Map Frame panel design
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.roundRect(mmX, mmY, mmSize, mmSize, 14);
+  ctx.fill();
+  ctx.stroke();
+  ctx.clip(); // Mask content inside boundary corners
+
+  // Draw simplified miniature ecosystem
+  ctx.fillStyle = '#7bc658'; // Grass ground layer
+  ctx.fillRect(mmX, mmY, mmSize, mmSize);
+
+  // Quick low-overhead structural sampling loops for rivers & roads
+  const step = 2;
+  const tw = mmSize / worldW;
+  const th = mmSize / worldH;
+  for(let y = 0; y < worldH; y += step) {
+      for(let x = 0; x < worldW; x += step) {
+          if (world[y][x] === T_WATER) {
+              ctx.fillStyle = '#5caee8';
+              ctx.fillRect(mmX + x * tw, mmY + y * th, tw * step, th * step);
+          } else if (world[y][x] === T_PATH || world[y][x] === T_BRIDGE) {
+              ctx.fillStyle = '#d9bd82';
+              ctx.fillRect(mmX + x * tw, mmY + y * th, tw * step, th * step);
+          }
+      }
+  }
+
+  // Centrally located Barn indicator
+  const mmBarnX = mmX + ((barnX * TILE + 60) / wTotalW) * mmSize;
+  const mmBarnY = mmY + ((barnY * TILE + 60) / wTotalH) * mmSize;
+  ctx.fillStyle = '#ff4444';
+  ctx.fillRect(mmBarnX - 4, mmBarnY - 4, 8, 8);
+
+  // Goats tracking specks (White dots)
+  ctx.fillStyle = '#ffffff';
+  for (const g of goats) {
+      const mx = mmX + (g.x / wTotalW) * mmSize;
+      const my = mmY + (g.y / wTotalH) * mmSize;
+      ctx.beginPath(); ctx.arc(mx, my, 1.5, 0, Math.PI*2); ctx.fill();
+  }
+
+  // Roaming Bears tracking specks (Dark Orange dots)
+  ctx.fillStyle = '#b75b18';
+  for (const b of bears) {
+      const mx = mmX + (b.x / wTotalW) * mmSize;
+      const my = mmY + (b.y / wTotalH) * mmSize;
+      ctx.beginPath(); ctx.arc(mx, my, 2.2, 0, Math.PI*2); ctx.fill();
+  }
+
+  // Active Player locator node (Deep blue color node)
+  const mmPlayX = mmX + (player.x / wTotalW) * mmSize;
+  const mmPlayY = mmY + (player.y / wTotalH) * mmSize;
+  ctx.fillStyle = '#3a72ff';
+  ctx.beginPath(); ctx.arc(mmPlayX, mmPlayY, 4.5, 0, Math.PI*2); ctx.fill();
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  ctx.restore();
+
+  requestAnimationFrame(render);
+}
+
+function gameLoop() {
+  update();
+  setTimeout(gameLoop, 1000/60);
+}
+
+gameLoop();
+render();
+</script>
+ </body>
+</html>

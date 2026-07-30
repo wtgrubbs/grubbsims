@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Le Chatelier's Principle — AP Chem Unit 7</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@500;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-outer: #0f172a; /* Dark slate */
+      --bg-inner: #ffffff;
+      --ink:      #0f172a;
+      --faded:    #64748b;
+      --border:   #cbd5e1;
+      --panel:    #f8fafc;
+      --amber:    #d97706;
+      --red:      #dc2626;
+      --teal:     #059669;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg-outer);
+      font-family: 'Inter', sans-serif;
+      color: var(--ink);
+      min-height: 100vh;
+      padding: 2rem;
+    }
+
+    .notebook {
+      max-width: 880px;
+      margin: 0 auto;
+      background: var(--bg-inner);
+      border-radius: 12px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .content { padding: 3rem 3.5rem; position: relative; z-index: 1; }
+
+    .hdr-stamp {
+      display: inline-block;
+      font-family: 'Inter', sans-serif;
+      font-size: 12px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase;
+      color: #ffffff; background: var(--teal);
+      border-radius: 99px;
+      padding: 6px 14px;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      font-family: 'Inter', sans-serif;
+      font-size: 38px; font-weight: 800; color: var(--ink); line-height: 1.2; margin-bottom: 8px;
+      letter-spacing: -0.02em;
+    }
+    
+    .subtitle {
+      font-size: 16px; color: var(--faded); font-weight: 600; margin-bottom: 12px;
+    }
+
+    .rxn-box {
+      display: inline-block; font-size: 20px; font-weight: 800;
+      background: var(--panel); border: 2px solid var(--border);
+      padding: 12px 24px; border-radius: 8px; margin: 16px 0 0; color: var(--ink);
+    }
+    
+    .rxn-meta { font-size: 13px; color: var(--faded); font-weight: 600; margin-top: 8px; }
+    
+    .divider-h { border: none; border-top: 2px solid var(--border); margin: 30px 0; }
+
+    .vessel-wrap {
+      position: relative; border: 4px solid var(--ink);
+      border-radius: 8px; overflow: hidden; margin-bottom: 10px; background: #000;
+    }
+    canvas#sim { display: block; width: 100%; height: 280px; }
+    .vessel-label {
+      position: absolute; top: 12px; right: 14px;
+      font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 800;
+      color: rgba(255,255,255,0.8); letter-spacing: 0.1em;
+    }
+
+    .key-text {
+      font-size: 13px; color: var(--faded); font-weight: 600; margin-bottom: 24px;
+    }
+
+    .status-strip {
+      display: flex; border: 2px solid var(--border);
+      border-radius: 8px; overflow: hidden; margin-bottom: 24px;
+    }
+    .ss-cell {
+      flex: 1; padding: 14px 20px;
+      border-right: 2px solid var(--border);
+      background: var(--panel);
+    }
+    .ss-cell:last-child { border-right: none; }
+    .ss-lbl { font-size: 12px; font-weight: 800; color: var(--faded); letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 4px; }
+    .ss-val { font-size: 24px; font-family: 'Fira Code', monospace; font-weight: 700; }
+    .v-teal { color: var(--teal); } .v-amber { color: var(--amber); } .v-red { color: var(--red); }
+
+    .msg-box {
+      border-left: 6px solid var(--amber); background: #fef3c7;
+      padding: 16px 20px; margin-bottom: 24px; border-radius: 4px 8px 8px 4px;
+      font-size: 15px; font-weight: 600; line-height: 1.5;
+      color: #92400e; min-height: 56px;
+    }
+    .msg-box.right { border-color: var(--teal); background: #d1fae5; color: #065f46; }
+    .msg-box.left  { border-color: var(--red);  background: #fee2e2; color: #991b1b; }
+    .msg-box.eq    { border-color: var(--faded); background: var(--panel); color: var(--faded); }
+    .c-right { font-weight: 800; text-decoration: underline; }
+    .c-left  { font-weight: 800; text-decoration: underline; }
+
+    .controls-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; }
+    @media(max-width:600px){ .controls-grid{ grid-template-columns:1fr; } }
+
+    .ctrl-section {
+      border: 2px solid var(--border); border-radius: 8px;
+      padding: 20px; background: #ffffff;
+    }
+    .ctrl-head {
+      font-size: 15px; font-weight: 800; color: var(--ink); text-transform: uppercase;
+      letter-spacing: 0.05em; margin-bottom: 16px; border-bottom: 2px solid var(--border); padding-bottom: 8px;
+    }
+    .btn-pair { display: flex; gap: 10px; margin-bottom: 12px; }
+    
+    .cbtn {
+      flex: 1; padding: 10px 0; font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 700;
+      border-radius: 6px; cursor: pointer; border: 2px solid; background: #ffffff;
+      transition: all 0.1s ease;
+    }
+    .cbtn:active { transform: scale(0.97); }
+    .cbtn-ar { border-color: var(--teal); color: var(--teal); }
+    .cbtn-ar:hover { background: var(--teal); color: #fff; }
+    .cbtn-rr { border-color: #a7f3d0; color: var(--teal); }
+    .cbtn-rr:hover { background: #ecfdf5; border-color: var(--teal); }
+    .cbtn-ap { border-color: var(--red); color: var(--red); }
+    .cbtn-ap:hover { background: var(--red); color: #fff; }
+    .cbtn-rp { border-color: #fecaca; color: var(--red); }
+    .cbtn-rp:hover { background: #fef2f2; border-color: var(--red); }
+    
+    .cbtn-reset {
+      width: 100%; padding: 10px; margin-top: 10px;
+      font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 700;
+      border: 2px dashed var(--border); border-radius: 6px;
+      color: var(--faded); background: #ffffff; cursor: pointer; transition: 0.2s;
+    }
+    .cbtn-reset:hover { background: var(--panel); color: var(--ink); border-color: var(--faded); }
+
+    .sl-row { margin-bottom: 18px; }
+    .sl-hdr { display: flex; justify-content: space-between; margin-bottom: 8px; }
+    .sl-lbl { font-size: 13px; font-weight: 700; color: var(--faded); }
+    .sl-val { font-family: 'Fira Code', monospace; font-size: 14px; font-weight: 700; color: var(--ink); }
+    input[type=range] {
+      width: 100%; -webkit-appearance: none; appearance: none;
+      height: 6px; border-radius: 3px; background: var(--border); outline: none; cursor: pointer;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 20px; height: 20px;
+      background: var(--amber); border-radius: 50%; cursor: pointer;
+    }
+    input[type=range]::-moz-range-thumb {
+      width: 20px; height: 20px; background: var(--amber); border: none; cursor: pointer; border-radius: 50%;
+    }
+
+    /* Fixed Bar Graph Styling */
+    .chart-wrap {
+      border: 2px solid var(--border); border-radius: 8px;
+      background: var(--panel); padding: 20px; margin-bottom: 24px;
+    }
+    .chart-head {
+      font-size: 15px; font-weight: 800; color: var(--ink); text-transform: uppercase;
+      letter-spacing: 0.05em; margin-bottom: 16px; border-bottom: 2px solid var(--border); padding-bottom: 8px;
+    }
+    .conc-bars { display: flex; gap: 40px; justify-content: center; align-items: flex-end; height: 120px; }
+    .bar-col { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+    .bar-track { 
+      height: 90px; width: 65px; 
+      background: #e2e8f0; border: 1px solid var(--border); 
+      display: flex; flex-direction: column; justify-content: flex-end; 
+      border-radius: 4px; overflow: hidden; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
+    }
+    .bar-fill { width: 100%; transition: height .25s ease; min-height: 4px; }
+    .bar-fill-a { background: #64748b; }
+    .bar-fill-b { background: var(--amber); }
+    .bar-val { font-family: 'Fira Code', monospace; font-size: 13px; font-weight: 700; color: var(--ink); }
+    .bar-name { font-size: 14px; font-weight: 800; color: var(--ink); }
+
+    .ref-panel {
+      background: #f1f5f9; border: 2px solid var(--border);
+      border-radius: 8px; padding: 24px;
+    }
+    .ref-head {
+      font-size: 16px; font-weight: 800; color: var(--ink); margin-bottom: 16px;
+    }
+    .ref-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 16px; }
+    @media(max-width:600px){ .ref-grid{ grid-template-columns:1fr; } }
+    .ref-scenario {
+      font-size: 13px; font-weight: 800; color: var(--ink);
+      text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;
+    }
+    .ref-rule { font-size: 14px; font-weight: 600; line-height: 1.5; color: var(--faded); }
+    .ref-eq {
+      font-family: 'Fira Code', monospace; font-size: 13px; font-weight: 500; color: var(--faded);
+      line-height: 1.8; margin-top: 16px;
+      border-top: 2px dashed var(--border); padding-top: 16px;
+    }
+    .hand-note {
+      font-size: 14px; font-weight: 700; color: var(--faded); text-align: center; margin-top: 24px; text-transform: uppercase; letter-spacing: 0.1em;
+    }
+  </style>
+</head>
+<body>
+<div class="notebook">
+  <div class="content">
+    <div class="hdr-stamp">AP Chemistry · Unit 7 · Equilibrium</div>
+    <h1>Le Chatelier's Principle</h1>
+    <p class="subtitle">Stress a system at equilibrium. Watch it resist and rebalance.</p>
+    <div class="rxn-box">N₂O₄(g) &nbsp;⇌&nbsp; 2 NO₂(g)</div>
+    <p class="rxn-meta">ΔH = +57 kJ/mol (endothermic forward) &nbsp;·&nbsp; K<sub>c</sub>(25°C) ≈ 0.14 &nbsp;·&nbsp; Colorless ⇌ Reddish-Brown</p>
+
+    <hr class="divider-h">
+
+    <div class="vessel-wrap">
+      <canvas id="sim" height="280"></canvas>
+      <div class="vessel-label">REACTION VESSEL</div>
+    </div>
+    
+    <p class="key-text">
+      ● <strong>N₂O₄</strong> (Planar, 2N &amp; 4O) &nbsp;·&nbsp; ● <strong>NO₂</strong> (Bent, 1N &amp; 2O) &nbsp;·&nbsp; Vessel darkens as [NO₂] increases
+    </p>
+
+    <div class="status-strip">
+      <div class="ss-cell">
+        <p class="ss-lbl">Q (reaction quotient)</p>
+        <p class="ss-val v-teal" id="q-val">0.1400</p>
+      </div>
+      <div class="ss-cell">
+        <p class="ss-lbl">K(T) at current temp</p>
+        <p class="ss-val v-amber" id="k-val">0.1400</p>
+      </div>
+      <div class="ss-cell">
+        <p class="ss-lbl">Temperature</p>
+        <p class="ss-val v-red" id="t-disp">25 °C</p>
+      </div>
+    </div>
+
+    <div class="msg-box eq" id="dir-msg">
+      System is at equilibrium — Q = K. No net reaction is occurring.
+    </div>
+
+    <div class="controls-grid">
+      <div class="ctrl-section">
+        <p class="ctrl-head">Add or remove species</p>
+        <div class="btn-pair">
+          <button class="cbtn cbtn-ar" onclick="stress('add','N2O4')">+ N₂O₄</button>
+          <button class="cbtn cbtn-rr" onclick="stress('remove','N2O4')">− N₂O₄</button>
+        </div>
+        <div class="btn-pair">
+          <button class="cbtn cbtn-ap" onclick="stress('add','NO2')">+ NO₂</button>
+          <button class="cbtn cbtn-rp" onclick="stress('remove','NO2')">− NO₂</button>
+        </div>
+        <button class="cbtn-reset" onclick="resetSim()">↺ Reset to Equilibrium</button>
+      </div>
+      <div class="ctrl-section">
+        <p class="ctrl-head">Temperature &amp; Pressure</p>
+        <div class="sl-row">
+          <div class="sl-hdr">
+            <span class="sl-lbl">Temperature (°C)</span>
+            <span class="sl-val" id="temp-out">25 °C</span>
+          </div>
+          <input type="range" id="temp-sl" min="10" max="150" step="1" value="25" oninput="onTemp(this)">
+        </div>
+        <div class="sl-row">
+          <div class="sl-hdr">
+            <span class="sl-lbl">Pressure (↑ compresses vessel)</span>
+            <span class="sl-val" id="pres-out">1.0 atm</span>
+          </div>
+          <input type="range" id="pres-sl" min="0.3" max="3.0" step="0.1" value="1.0" oninput="onPres(this)">
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-wrap">
+      <p class="chart-head">Live Concentrations (mol / L)</p>
+      <div class="conc-bars">
+        <div class="bar-col">
+          <div class="bar-val" id="barA-val">0.384</div>
+          <div class="bar-track">
+            <div class="bar-fill bar-fill-a" id="barA"></div>
+          </div>
+          <div class="bar-name">N₂O₄</div>
+        </div>
+        <div class="bar-col">
+          <div class="bar-val" id="barB-val">0.232</div>
+          <div class="bar-track">
+            <div class="bar-fill bar-fill-b" id="barB"></div>
+          </div>
+          <div class="bar-name">NO₂</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ref-panel">
+      <p class="ref-head">Reference — What the principle predicts</p>
+      <div class="ref-grid">
+        <div>
+          <p class="ref-scenario">Add N₂O₄ (reactant)</p>
+          <p class="ref-rule">Q &lt; K → shifts <span class="c-right">RIGHT</span><br>More NO₂ forms until Q = K</p>
+        </div>
+        <div>
+          <p class="ref-scenario">Add NO₂ (product)</p>
+          <p class="ref-rule">Q &gt; K → shifts <span class="c-left">LEFT</span><br>N₂O₄ reforms until Q = K</p>
+        </div>
+        <div>
+          <p class="ref-scenario">Increase temperature</p>
+          <p class="ref-rule">K ↑ (endothermic fwd)<br>Q &lt; K → shifts <span class="c-right">RIGHT</span></p>
+        </div>
+        <div>
+          <p class="ref-scenario">Increase pressure</p>
+          <p class="ref-rule">Fewer gas moles favoured<br>Q &gt; K → shifts <span class="c-left">LEFT</span></p>
+        </div>
+      </div>
+      <p class="ref-eq">
+        K<sub>c</sub> = [NO₂]² / [N₂O₄]<br>
+        K(T) = K₀ · exp[(ΔH/R) · (1/T₀ − 1/T)] &nbsp; (R = 8.314 J·mol⁻¹·K⁻¹)
+      </p>
+    </div>
+
+    <p class="hand-note">— Observe · Stress · Rebalance —</p>
+  </div>
+</div>
+
+<script>
+  const R_GAS=8.314, DH=57000, K0=0.14, T_REF=298.15, ALPHA=0.45;
+  let st={nA:0.384,nB:0.232,T:298.15,V:1.0};
+  let flashAmt=0, stressMsg='', stressUntil=0, canvasW=0;
+  const N_PARTS=50;
+  let parts=[];
+
+  const getK=T=>K0*Math.exp((DH/R_GAS)*(1/T_REF-1/T));
+  const cA=()=>st.nA/st.V;
+  const cB=()=>st.nB/st.V;
+  const getQ=()=>{const a=cA();return a<1e-9?1e9:(cB()*cB())/a;};
+
+  function stepODE(dt){
+    const K=getK(st.T), drive=K*st.nA-(st.nB*st.nB)/st.V, rate=ALPHA*drive;
+    st.nA=Math.max(1e-9,st.nA-rate*dt);
+    st.nB=Math.max(1e-9,st.nB+2*rate*dt);
+  }
+
+  function flash(){flashAmt=0.35;}
+
+  function stress(dir,sp){
+    const d=dir==='add'?0.28:-0.22;
+    if(sp==='N2O4'){st.nA=Math.max(1e-9,st.nA+d);stressMsg=dir==='add'?'N₂O₄ added → Q drops below K → system shifts <RIGHT> to form more NO₂':'N₂O₄ removed → Q rises above K → system shifts <LEFT> to replenish N₂O₄';}
+    else{st.nB=Math.max(1e-9,st.nB+d);stressMsg=dir==='add'?'NO₂ added → Q rises above K → system shifts <LEFT> to form more N₂O₄':'NO₂ removed → Q drops below K → system shifts <RIGHT> to replenish NO₂';}
+    stressUntil=Date.now()+3500;flash();
+  }
+
+  function onTemp(el){
+    const Tc=parseFloat(el.value);
+    document.getElementById('temp-out').textContent=Tc+' °C';
+    document.getElementById('t-disp').textContent=Tc+' °C';
+    const oldK=getK(st.T);st.T=Tc+273.15;const newK=getK(st.T);
+    stressMsg=newK>oldK?'Temperature ↑ → K rises (endothermic rxn) → Q < K → shifts <RIGHT>, more NO₂':'Temperature ↓ → K falls → Q > K → shifts <LEFT>, more N₂O₄';
+    stressUntil=Date.now()+3500;flash();
+  }
+
+  function onPres(el){
+    const P=parseFloat(el.value);
+    document.getElementById('pres-out').textContent=P.toFixed(1)+' atm';
+    const oldV=st.V;st.V=1.0/P;
+    stressMsg=st.V<oldV?'Pressure ↑ (volume ↓) → Q > K → shifts <LEFT> (fewer moles of gas favoured)':'Pressure ↓ (volume ↑) → Q < K → shifts <RIGHT> (more moles of gas produced)';
+    stressUntil=Date.now()+3500;flash();
+  }
+
+  function resetSim(){
+    st={nA:0.384,nB:0.232,T:298.15,V:1.0};
+    document.getElementById('temp-sl').value=25;document.getElementById('pres-sl').value=1.0;
+    document.getElementById('temp-out').textContent='25 °C';document.getElementById('pres-out').textContent='1.0 atm';
+    document.getElementById('t-disp').textContent='25 °C';
+    stressMsg='';stressUntil=0;flash();
+  }
+
+  function initParts(W,H){
+    parts=Array.from({length:N_PARTS},()=>({
+      x:20+Math.random()*(W-40),y:20+Math.random()*(H-40),
+      vx:(Math.random()-0.5)*1.8,vy:(Math.random()-0.5)*1.8,
+      theta: Math.random() * Math.PI * 2,
+      omega: (Math.random() - 0.5) * 0.15,
+      type:'A',pulse:0
+    }));
+  }
+
+  function moveParts(W,H,dt){
+    const fA=st.nA/(st.nA+st.nB+1e-9),nAs=Math.round(fA*N_PARTS);
+    parts.forEach((p,i)=>{
+      const nt=i<nAs?'A':'B';
+      if(nt!==p.type){p.type=nt;p.pulse=1.0;}else p.pulse=Math.max(0,p.pulse-dt*2.5);
+      p.x+=p.vx;p.y+=p.vy;
+      p.theta+=p.omega;
+      
+      const r = p.type === 'A' ? 16 : 10;
+      if(p.x<r){p.x=r;p.vx=Math.abs(p.vx);}if(p.x>W-r){p.x=W-r;p.vx=-Math.abs(p.vx);}
+      if(p.y<r){p.y=r;p.vy=Math.abs(p.vy);}if(p.y>H-r){p.y=H-r;p.vy=-Math.abs(p.vy);}
+      const spd=Math.hypot(p.vx,p.vy);
+      if(spd<0.5||spd>3.2){const a=Math.random()*Math.PI*2,s=0.9+Math.random()*1.1;p.vx=Math.cos(a)*s;p.vy=Math.sin(a)*s;}
+    });
+  }
+
+  function drawParts(ctx){
+    const colorN = '#94a3b8'; // Lighter Grey Nitrogen for contrast
+    const colorO = '#ef4444'; // Brighter Red Oxygen for contrast
+    const rN = 4.5, rO = 4, bondL = 8;
+    
+    parts.forEach(p=>{
+      const isA = p.type === 'A';
+      
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.theta);
+
+      if(p.pulse>0){
+        const pr = isA ? 16 : 10;
+        ctx.beginPath();ctx.arc(0,0,pr+p.pulse*12,0,Math.PI*2);
+        ctx.fillStyle=`rgba(255,255,255,${p.pulse*0.3})`;ctx.fill();
+      }
+
+      if (!isA) {
+        // NO2 (Bent)
+        const a1 = Math.PI / 6;  
+        const a2 = 5 * Math.PI / 6; 
+        const o1x = bondL * Math.cos(a1), o1y = bondL * Math.sin(a1);
+        const o2x = bondL * Math.cos(a2), o2y = bondL * Math.sin(a2);
+
+        ctx.beginPath();
+        ctx.moveTo(0,0); ctx.lineTo(o1x, o1y);
+        ctx.moveTo(0,0); ctx.lineTo(o2x, o2y);
+        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.stroke();
+
+        ctx.beginPath(); ctx.arc(0, 0, rN, 0, Math.PI * 2);
+        ctx.fillStyle = colorN; ctx.fill();
+
+        ctx.beginPath(); 
+        ctx.arc(o1x, o1y, rO, 0, Math.PI * 2); ctx.closePath();
+        ctx.arc(o2x, o2y, rO, 0, Math.PI * 2);
+        ctx.fillStyle = colorO; ctx.fill();
+
+      } else {
+        // N2O4 (Planar)
+        const nnL = 10; 
+        const n1x = -nnL/2, n2x = nnL/2;
+        
+        const a1 = 2 * Math.PI / 3; 
+        const a2 = 4 * Math.PI / 3; 
+        const a3 = Math.PI / 3; 
+        const a4 = -Math.PI / 3; 
+
+        const o1x = n1x + bondL * Math.cos(a1), o1y = bondL * Math.sin(a1);
+        const o2x = n1x + bondL * Math.cos(a2), o2y = bondL * Math.sin(a2);
+        const o3x = n2x + bondL * Math.cos(a3), o3y = bondL * Math.sin(a3);
+        const o4x = n2x + bondL * Math.cos(a4), o4y = bondL * Math.sin(a4);
+
+        ctx.beginPath();
+        ctx.moveTo(n1x, 0); ctx.lineTo(n2x, 0); 
+        ctx.moveTo(n1x, 0); ctx.lineTo(o1x, o1y);
+        ctx.moveTo(n1x, 0); ctx.lineTo(o2x, o2y);
+        ctx.moveTo(n2x, 0); ctx.lineTo(o3x, o3y);
+        ctx.moveTo(n2x, 0); ctx.lineTo(o4x, o4y);
+        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.stroke();
+
+        ctx.beginPath(); 
+        ctx.arc(n1x, 0, rN, 0, Math.PI * 2); ctx.closePath();
+        ctx.arc(n2x, 0, rN, 0, Math.PI * 2);
+        ctx.fillStyle = colorN; ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(o1x, o1y, rO, 0, Math.PI * 2); ctx.closePath();
+        ctx.arc(o2x, o2y, rO, 0, Math.PI * 2); ctx.closePath();
+        ctx.arc(o3x, o3y, rO, 0, Math.PI * 2); ctx.closePath();
+        ctx.arc(o4x, o4y, rO, 0, Math.PI * 2);
+        ctx.fillStyle = colorO; ctx.fill();
+      }
+      ctx.restore();
+    });
+  }
+
+  const canvas=document.getElementById('sim'),ctx=canvas.getContext('2d');
+  const H_PX=280;
+  let lastT=performance.now(),uiTimer=0;
+
+  function frame(now){
+    const dt=Math.min((now-lastT)/1000,0.05);lastT=now;
+    for(let i=0;i<8;i++)stepODE(dt/8);
+    const W=canvas.offsetWidth||700;
+    if(W!==canvasW){canvasW=W;canvas.width=W;canvas.height=H_PX;initParts(W,H_PX);}
+    const fracB=st.nB/(st.nA+st.nB+1e-9);
+    
+    // Background dynamic color
+    ctx.fillStyle='#0f172a';ctx.fillRect(0,0,W,H_PX);
+    ctx.fillStyle=`rgba(220, 38, 38, ${fracB*0.4})`;ctx.fillRect(0,0,W,H_PX);
+    
+    if(flashAmt>0){ctx.fillStyle=`rgba(255,255,255,${flashAmt})`;ctx.fillRect(0,0,W,H_PX);flashAmt=Math.max(0,flashAmt-dt*2.0);}
+    moveParts(W,H_PX,dt);drawParts(ctx);
+    
+    const Q=getQ(),K=getK(st.T),drift=Q/K;
+    if(Math.abs(drift-1)>0.025){
+      const dir=drift<1?1:-1,cx=W/2,cy=H_PX-24,len=Math.min(70,W*0.09),col=dir>0?'#34d399':'#fbbf24';
+      ctx.save();ctx.strokeStyle=col;ctx.lineWidth=3;ctx.lineCap='round';
+      ctx.beginPath();ctx.moveTo(cx-dir*len,cy);ctx.lineTo(cx+dir*len,cy);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(cx+dir*len,cy);ctx.lineTo(cx+dir*len-dir*10,cy-7);ctx.moveTo(cx+dir*len,cy);ctx.lineTo(cx+dir*len-dir*10,cy+7);ctx.stroke();
+      ctx.fillStyle=col;ctx.font='600 12px "Inter",sans-serif';ctx.textAlign='center';
+      ctx.fillText(dir>0?'SHIFTING RIGHT →':'← SHIFTING LEFT',cx,cy-14);ctx.restore();
+    }
+    
+    ctx.font='700 13px "Inter",sans-serif';ctx.textAlign='center';
+    ctx.fillStyle='rgba(255,255,255,0.4)';
+    ctx.fillText('N₂O₄(g)  ⇌  2 NO₂(g)',W/2,24);
+    
+    uiTimer+=dt;if(uiTimer>0.067){uiTimer=0;updateUI(Q,K);}
+    requestAnimationFrame(frame);
+  }
+
+  function updateUI(Q,K){
+    document.getElementById('q-val').textContent=Q>99?'> 99':Q.toFixed(4);
+    document.getElementById('k-val').textContent=K.toFixed(4);
+    const dirEl=document.getElementById('dir-msg'),ratio=Q/K,isEq=Math.abs(ratio-1)<0.022;
+    const showS=stressMsg&&Date.now()<stressUntil;
+    if(showS){
+      let h=stressMsg;
+      h=h.replace('<RIGHT>','<span class="c-right">RIGHT ↗</span>');
+      h=h.replace('<LEFT>','<span class="c-left">LEFT ↙</span>');
+      dirEl.innerHTML=h;dirEl.className='msg-box';
+    }else if(isEq){dirEl.textContent='System is at equilibrium — Q ≈ K. No net reaction is occurring.';dirEl.className='msg-box eq';}
+    else if(ratio<1){dirEl.textContent=`Shifting RIGHT ↗ — Q = ${Q.toFixed(4)} < K = ${K.toFixed(4)}. System produces more NO₂.`;dirEl.className='msg-box right';}
+    else{dirEl.textContent=`Shifting LEFT ↙ — Q = ${Q.toFixed(4)} > K = ${K.toFixed(4)}. System reforms N₂O₄.`;dirEl.className='msg-box left';}
+    
+    // Set fixed upper limit (2.0 mol/L) to allow absolute visual tracking of rising metrics
+    const ca=cA(), cb=cB();
+    const MAX_CONC=2.0; 
+    const pA=Math.min(100, (ca/MAX_CONC)*100);
+    const pB=Math.min(100, (cb/MAX_CONC)*100);
+    
+    document.getElementById('barA').style.height=pA+'%';
+    document.getElementById('barB').style.height=pB+'%';
+    document.getElementById('barA-val').textContent=ca.toFixed(3);
+    document.getElementById('barB-val').textContent=cb.toFixed(3);
+  }
+
+  requestAnimationFrame(frame);
+</script>
+</body>
+</html>

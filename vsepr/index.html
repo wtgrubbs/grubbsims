@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Molecular Blueprint - VSEPR Terminal</title>
+    <link href="https://fonts.googleapis.com/css2?family=Syne+Mono&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <style>
+        :root {
+            --neon-blue: #00f2ff;
+            --neon-green: #39ff14;
+            --neon-red: #ff3131;
+            --vex-purple: #ba1cbe;
+            --glass: rgba(10, 25, 41, 0.9);
+        }
+
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            font-family: 'Syne Mono', monospace; 
+            background: #020508; 
+            color: white; 
+            touch-action: none; 
+        }
+        
+        #grid-bg {
+            position: fixed; inset: 0;
+            background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+            background-size: 30px 30px;
+            pointer-events: none; z-index: 1;
+        }
+
+        #canvas-container { position: fixed; inset: 0; z-index: 2; }
+
+        #game-ui { position: relative; z-index: 10; height: 100vh; width: 100vw; pointer-events: none; }
+        .hud-panel { position: absolute; background: var(--glass); border: 1px solid var(--neon-blue); padding: 15px; border-radius: 8px; pointer-events: auto; font-family: 'Syne Mono', monospace; }
+        
+        #orbital-toggle { top: 20px; right: 420px; color: var(--neon-blue); cursor: pointer; border-color: var(--neon-blue); font-size: 0.8em; }
+
+        #steric-display { top: 20px; left: calc(50% - 170px); transform: translateX(-50%); font-size: 1.4em; border: none; color: var(--vex-purple); background: none; font-weight: bold; }
+
+        #audit-bar { bottom: 20px; left: 20px; border-left: 4px solid var(--neon-green); background: rgba(0,0,0,0.6); padding: 10px 20px; font-size: 0.8em; letter-spacing: 2px; }
+
+        .sidebar { right: 0; top: 0; width: 340px; height: 100%; border-radius: 0; border-left: 2px solid var(--neon-blue); display: flex; flex-direction: column; gap: 15px; overflow-y: auto; }
+        .sidebar-header { text-align: center; text-decoration: underline; color: var(--neon-blue); margin-top: 10px; }
+        
+        input, select { width: 100%; background: #000; border: 1px solid var(--neon-blue); color: white; padding: 10px; margin-top: 5px; box-sizing: border-box; font-family: 'Syne Mono', monospace; }
+        .error-border { border: 2px solid var(--neon-red) !important; box-shadow: 0 0 10px var(--neon-red); }
+        .correct-border { border: 2px solid var(--neon-green) !important; box-shadow: 0 0 10px var(--neon-green); }
+
+        .start-btn { 
+            margin-top: 20px; padding: 12px 30px; background: transparent; 
+            border: 1px solid var(--neon-blue); color: var(--neon-blue); 
+            cursor: pointer; font-weight: bold; transition: 0.2s; width: 100%; 
+            font-family: 'Syne Mono', monospace;
+        }
+        .start-btn:hover { background: var(--neon-blue); color: black; }
+        .purple-btn { border-color: var(--vex-purple) !important; color: var(--vex-purple) !important; }
+        .purple-btn:hover { background: var(--vex-purple) !important; color: white !important; }
+
+        #vsepr-key { bottom: 20px; right: 420px; font-size: 0.75em; line-height: 1.6; border-color: rgba(0, 242, 255, 0.3); }
+        .key-item { display: flex; align-items: center; gap: 8px; }
+        .key-dot { width: 10px; height: 10px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+        .key-lp { background: var(--neon-red); opacity: 0.6; position: relative; }
+        .key-lp::after { content: '..'; color: white; position: absolute; font-size: 8px; font-weight: bold; top: -1px; }
+
+    </style>
+</head>
+<body>
+
+<div id="grid-bg"></div>
+<div id="canvas-container"></div>
+
+<div id="game-ui">
+    <button class="hud-panel" id="orbital-toggle" onclick="toggleOrbitals()">ORBITAL VIEW: OFF</button>
+    
+    <div class="hud-panel" id="steric-display"></div>
+
+    <div id="audit-bar" class="hud-panel">MOLECULES AUDITED: <span id="audit-count" style="color:var(--neon-green)">0</span></div>
+
+    <div id="vsepr-key" class="hud-panel">
+        <div class="key-item"><div class="key-dot" style="background:var(--neon-blue)"></div> Bonding Domain</div>
+        <div class="key-item"><div class="key-dot key-lp"></div> Lone Pair (nonbonding e-)</div>
+    </div>
+
+    <div class="hud-panel sidebar" id="v-sidebar">
+        <h3 class="sidebar-header">VSEPR Data Analysis</h3>
+        <div><label>Bonding Domains</label><input type="number" id="ans-bond" oninput="resetEl(this)"></div>
+        <div><label>Lone Pairs</label><input type="number" id="ans-lone" oninput="resetEl(this)"></div>
+        <div><label>Molecular Shape</label>
+            <select id="ans-shape" onchange="resetEl(this)">
+                <option value="">Select...</option>
+                <option value="Linear">Linear</option>
+                <option value="Trigonal Planar">Trigonal Planar</option>
+                <option value="Bent">Bent</option>
+                <option value="Tetrahedral">Tetrahedral</option>
+                <option value="Trigonal Pyramidal">Trigonal Pyramidal</option>
+                <option value="Trigonal Bipyramidal">Trigonal Bipyramidal</option>
+                <option value="See-saw">See-saw</option>
+                <option value="T-shape">T-shape</option>
+                <option value="Octahedral">Octahedral</option>
+                <option value="Square Pyramidal">Square Pyramidal</option>
+                <option value="Square Planar">Square Planar</option>
+            </select>
+        </div>
+        <div><label>Bond Angle(s)-if structure has 3 angle types, ignore 180° option</label>
+            <select id="ans-angle" onchange="resetEl(this)">
+                <option value="">Select...</option>
+                <option value="180">180°</option>
+                <option value="120">120°</option>
+                <option value="109.5">109.5°</option>
+                <option value="<120">< 120°</option>
+                <option value="<109.5">< 109.5°</option>
+                <option value="90/120">90°/120°</option>
+                <option value="<90/<120">< 90°/< 120°</option>
+                <option value="90">90°</option>
+                <option value="<90">< 90°</option>
+                <option value="90/180">90°/180°</option>
+                <option value="<90/<180">< 90°/< 180°</option>
+            </select>
+        </div>
+        <div><label>Hybridization</label>
+            <select id="ans-hyb" onchange="resetEl(this)">
+                <option value="">Select...</option>
+                <option value="sp">sp</option>
+                <option value="sp2">sp2</option>
+                <option value="sp3">sp3</option>
+                <option value="sp3d">sp3d</option>
+                <option value="sp3d2">sp3d2</option>
+            </select>
+        </div>
+        <button class="start-btn purple-btn" onclick="validateVSEPR()">VERIFY DATA</button>
+        <p id="v-msg" style="font-size:0.8em; color:var(--neon-blue); text-align: center;"></p>
+    </div>
+</div>
+
+<script>
+    const DB = {
+        vsepr: [
+            { s: 2, b: 2, l: 0, n: "Linear", a: "180", h: "sp", c: [[0,0,3], [0,0,-3]] },
+            { s: 3, b: 3, l: 0, n: "Trigonal Planar", a: "120", h: "sp2", c: [[3,0,0], [-1.5,2.6,0], [-1.5,-2.6,0]] },
+            { s: 3, b: 2, l: 1, n: "Bent", a: "<120", h: "sp2", c: [[2.5,-1.2,0], [-2.5,-1.2,0], [0,3,0]] },
+            { s: 4, b: 4, l: 0, n: "Tetrahedral", a: "109.5", h: "sp3", c: [[0,3,0], [2.8,-1,0], [-1.4,-1,2.4], [-1.4,-1,-2.4]] },
+            { s: 4, b: 3, l: 1, n: "Trigonal Pyramidal", a: "<109.5", h: "sp3", c: [[2.6,-1.2,0], [-1.3,-1.2,2.2], [-1.3,-1.2,-2.2], [0,3.3,0]] },
+            { s: 4, b: 2, l: 2, n: "Bent", a: "<109.5", h: "sp3", c: [[2.5,-1.2,0], [-2.5,-1.2,0], [0,3,1], [0,3,-1]] },
+            { s: 5, b: 5, l: 0, n: "Trigonal Bipyramidal", a: "90/120", h: "sp3d", c: [[0,3,0], [0,-3,0], [2.5,0,0], [-1.2,0,2.1], [-1.2,0,-2.1]] },
+            { s: 5, b: 4, l: 1, n: "See-saw", a: "<90/<120", h: "sp3d", c: [[0,3,0], [0,-3,0], [-1.2,0,2.1], [-1.2,0,-2.1], [2.5,0,0]] },
+            { s: 5, b: 3, l: 2, n: "T-shape", a: "<90/<180", h: "sp3d", c: [[0,3,0], [0,-3,0], [2.5,0,0], [-1.2,0,2.1], [-1.2,0,-2.1]] },
+            { s: 5, b: 2, l: 3, n: "Linear", a: "180", h: "sp3d", c: [[0,3,0], [0,-3,0], [2.5,0,0], [-1.2,0,2.1], [-1.2,0,-2.1]] },
+            { s: 6, b: 6, l: 0, n: "Octahedral", a: "90/180", h: "sp3d2", c: [[0,3,0], [0,-3,0], [3,0,0], [-3,0,0], [0,0,3], [0,0,-3]] },
+            { s: 6, b: 5, l: 1, n: "Square Pyramidal", a: "<90/<180", h: "sp3d2", c: [[3,0,0], [-3,0,0], [0,0,3], [0,0,-3], [0,3,0], [0,-3,0]] },
+            { s: 6, b: 4, l: 2, n: "Square Planar", a: "90/180", h: "sp3d2", c: [[3,0,0], [-3,0,0], [0,0,3], [0,0,-3], [0,3,0], [0,-3,0]] }
+        ]
+    };
+
+    let scene, camera, renderer, controls, scanRing, moleculeGroup, orbitalGroup;
+    let currentTask = null, lastSteric = null, auditedCount = 0, orbitalsVisible = false;
+
+    // Automatically initialize on load
+    initEngine();
+    nextRound();
+    animate();
+
+    function updateCameraOffset() {
+        const sidebarWidth = 340;
+        camera.setViewOffset(window.innerWidth, window.innerHeight, sidebarWidth / 2, 0, window.innerWidth, window.innerHeight);
+    }
+
+    function initEngine() {
+        const container = document.getElementById('canvas-container');
+        if (renderer) return;
+
+        scene = new THREE.Scene();
+        camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 5, 12);
+        updateCameraOffset();
+        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        container.appendChild(renderer.domElement);
+        controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.target.set(0, 0, 0);
+        scene.add(new THREE.AmbientLight(0xffffff, 0.9));
+        const pLight = new THREE.PointLight(0x00f2ff, 1.5, 100);
+        pLight.position.set(10, 10, 10);
+        scene.add(pLight);
+        
+        // Scan Ring
+        const ringGeo = new THREE.TorusGeometry(4.5, 0.03, 16, 100);
+        const ringMat = new THREE.MeshBasicMaterial({ color: 0x00f2ff, transparent: true, opacity: 0.15 });
+        scanRing = new THREE.Mesh(ringGeo, ringMat);
+        scanRing.rotation.x = Math.PI / 2;
+        scene.add(scanRing);
+        
+        moleculeGroup = new THREE.Group();
+        scene.add(moleculeGroup);
+        orbitalGroup = new THREE.Group();
+        scene.add(orbitalGroup);
+        orbitalGroup.visible = orbitalsVisible;
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth/window.innerHeight; 
+            updateCameraOffset();
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    }
+
+    function toggleOrbitals() {
+        orbitalsVisible = !orbitalsVisible;
+        const btn = document.getElementById('orbital-toggle');
+        btn.innerText = `ORBITAL VIEW: ${orbitalsVisible ? 'ON' : 'OFF'}`;
+        btn.style.color = orbitalsVisible ? 'var(--neon-green)' : 'var(--neon-blue)';
+        orbitalGroup.visible = orbitalsVisible;
+    }
+
+    function nextRound() {
+        resetInputs();
+        
+        let pool = DB.vsepr.filter(item => item.s !== lastSteric);
+        if (pool.length === 0) pool = DB.vsepr;
+        currentTask = pool[Math.floor(Math.random() * pool.length)];
+        lastSteric = currentTask.s;
+        
+        document.getElementById('steric-display').innerText = `STERIC NUMBER: ${currentTask.s}`;
+        renderMolecule(currentTask);
+    }
+
+    function renderMolecule(data) {
+        while(moleculeGroup.children.length > 0) moleculeGroup.remove(moleculeGroup.children[0]);
+        while(orbitalGroup.children.length > 0) orbitalGroup.remove(orbitalGroup.children[0]);
+        
+        // Central Atom
+        const core = new THREE.Mesh(new THREE.SphereGeometry(0.8, 32, 32), new THREE.MeshPhongMaterial({color: 0xffffff}));
+        moleculeGroup.add(core);
+        
+        data.c.forEach((pos, i) => {
+            const isLP = i >= data.b;
+            const domainPos = new THREE.Vector3(...pos);
+            
+            // Create container group for this domain to handle rotation/positioning together
+            const domainGroup = new THREE.Group();
+            
+            // Sphere representing the domain
+            const domainSphere = new THREE.Mesh(new THREE.SphereGeometry(0.5, 32, 32), new THREE.MeshPhongMaterial({
+                color: isLP ? 0xff3131 : 0x00f2ff, 
+                transparent: isLP, 
+                opacity: isLP ? 0.2 : 1 // Made sphere more transparent to see dots
+            }));
+            domainGroup.add(domainSphere);
+
+            if(isLP) {
+                // Add white dots for nonbonding electrons
+                const dotGeo = new THREE.SphereGeometry(0.08, 16, 16);
+                const dotMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+                
+                const dot1 = new THREE.Mesh(dotGeo, dotMat);
+                dot1.position.set(0.15, 0, 0); // Offset slightly
+                
+                const dot2 = new THREE.Mesh(dotGeo, dotMat);
+                dot2.position.set(-0.15, 0, 0); // Offset slightly
+                
+                domainGroup.add(dot1, dot2);
+            } else {
+                // Bonding line
+                const lineGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), domainPos]);
+                moleculeGroup.add(new THREE.Line(lineGeo, new THREE.LineBasicMaterial({color: 0x888888})));
+            }
+            
+            domainGroup.position.copy(domainPos);
+            
+            // Orient LP dots to face central atom generally, or orient to look good from camera
+            if (isLP) {
+                domainGroup.lookAt(0,0,0); 
+            }
+
+            moleculeGroup.add(domainGroup);
+
+            // Orbital Hybridization Lobes
+            const lobe = new THREE.Mesh(new THREE.SphereGeometry(0.8, 32, 16), new THREE.MeshBasicMaterial({ 
+                color: isLP ? 0xff3131 : 0xffa500, // Make LP hybrid lobes reddish
+                transparent: true, 
+                opacity: 0.2, 
+                blending: THREE.AdditiveBlending 
+            }));
+            lobe.scale.set(1, 1, 2.2);
+            lobe.lookAt(domainPos);
+            lobe.position.copy(domainPos.clone().normalize().multiplyScalar(1.5));
+            orbitalGroup.add(lobe);
+        });
+    }
+
+    function validateVSEPR() {
+        const checks = [
+            { id: 'ans-bond', val: currentTask.b },
+            { id: 'ans-lone', val: currentTask.l },
+            { id: 'ans-shape', val: currentTask.n },
+            { id: 'ans-angle', val: currentTask.a },
+            { id: 'ans-hyb', val: currentTask.h }
+        ];
+        
+        let pass = true;
+        checks.forEach(c => {
+            const el = document.getElementById(c.id);
+            if(el.value == c.val) {
+                el.className = 'correct-border';
+            } else {
+                el.className = 'error-border';
+                pass = false;
+            }
+        });
+        
+        if(pass) {
+            auditedCount++;
+            document.getElementById('audit-count').innerText = auditedCount;
+            document.getElementById('v-msg').innerText = "AUDIT COMPLETE. SCANNING NEXT...";
+            document.getElementById('v-msg').style.color = "var(--neon-green)";
+            setTimeout(nextRound, 1500);
+        } else {
+            document.getElementById('v-msg').innerText = "ERROR: DATA MISMATCH.";
+            document.getElementById('v-msg').style.color = "var(--neon-red)";
+        }
+    }
+
+    function resetInputs() {
+        ['ans-bond','ans-lone','ans-shape','ans-angle','ans-hyb'].forEach(id => {
+            const el = document.getElementById(id);
+            if(el) { el.value = ''; el.className = ''; }
+        });
+        document.getElementById('v-msg').innerText = '';
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+        if(scanRing) { 
+            scanRing.rotation.z += 0.005; 
+            scanRing.rotation.y += 0.002; 
+        }
+        if (controls) controls.update();
+        if (renderer && scene && camera) renderer.render(scene, camera);
+    }
+
+    function resetEl(el) { el.classList.remove('error-border', 'correct-border'); }
+</script>
+</body>
+</html>
