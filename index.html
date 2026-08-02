@@ -1,607 +1,657 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GrubbSims — Interactive STEM Web Labs</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  
-  <style>
-    :root {
-      --bg: #0f172a;
-      --card-bg: #1e293b;
-      --card-border: #334155;
-      --text-main: #f8fafc;
-      --text-muted: #94a3b8;
-      --accent: #38bdf8;
-      --accent-hover: #0284c7;
-      --badge-bg: #0284c720;
-      --badge-text: #38bdf8;
-    }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GrubbFit - Data Analysis</title>
+    <!-- External Libraries -->
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/regression/2.0.1/regression.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.11.0/math.min.js"></script>
+    
+    <style>
+        :root {
+            --primary: #003366; /* NCSSM Blue-ish */
+            --secondary: #f4f4f4;
+            --border: #ccc;
+            --accent: #28a745;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f9f9f9;
+            color: #333;
+        }
+        h1 {
+            color: var(--primary);
+            text-align: center;
+            margin-bottom: 5px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 20px;
+            font-style: italic;
+        }
+        .grid-container {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            grid-template-rows: auto auto;
+            gap: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .panel {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            position: relative;
+        }
+        
+        /* Table & Inputs */
+        .table-container {
+            max-height: 400px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+        }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid var(--border); padding: 8px; text-align: center; }
+        th { background-color: var(--secondary); padding: 0; }
+        th input { 
+            width: 100%; box-sizing: border-box; background: transparent; 
+            border: none; padding: 8px; text-align: center; font-weight: bold; 
+        }
+        th input:focus { outline: 2px solid var(--primary); background: white; }
+        td input[type="text"] { width: 90%; padding: 4px; border: none; text-align: center; }
+        td input[type="text"]:focus { outline: 1px solid var(--primary); }
+        
+        /* Controls */
+        .controls { display: flex; flex-direction: column; gap: 15px; }
+        .btn-group { display: flex; gap: 10px; flex-wrap: wrap; }
+        button, select, input[type="file"]::file-selector-button {
+            background-color: var(--primary); color: white; border: none;
+            padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 14px;
+        }
+        button:hover, input[type="file"]::file-selector-button:hover { background-color: #002244; }
+        select { background-color: white; color: #333; border: 1px solid var(--border); }
+        .btn-info { background-color: #17a2b8; padding: 4px 8px; font-size: 12px; }
+        .btn-info:hover { background-color: #138496; }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+        /* Stats */
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 14px; }
+        .stat-box { background: var(--secondary); padding: 10px; border-radius: 4px; border-left: 4px solid var(--primary); }
+        .full-width { grid-column: span 2; }
+        .param-row { display: flex; justify-content: space-between; margin-bottom: 4px; border-bottom: 1px dashed #ddd; padding-bottom: 2px; align-items: center;}
+        
+        /* Modals */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
+        .modal-content { background-color: #fff; margin: 5% auto; padding: 20px; border-radius: 8px; width: 90%; max-width: 600px; position: relative; max-height: 90vh; overflow-y: auto;}
+        .close { color: #aaa; float: right; font-size: 24px; font-weight: bold; cursor: pointer; line-height: 20px; }
+        .close:hover { color: black; }
+        .modal-content li { margin-bottom: 10px; }
 
-    body {
-      font-family: 'Inter', system-ui, -apple-system, sans-serif;
-      background-color: var(--bg);
-      color: var(--text-main);
-      line-height: 1.6;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-    }
-
-    header {
-      padding: 3rem 1.5rem 2rem;
-      text-align: center;
-      max-width: 900px;
-      margin: 0 auto;
-    }
-
-    /* Updated branding container */
-    .brand-header {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 24px;
-      margin-bottom: 1.25rem;
-    }
-
-    /* Prominent avatar styling */
-    .brand-avatar {
-      width: 110px; 
-      height: 110px;
-      object-fit: contain;
-      border-radius: 20px;
-      background-color: #ffffff;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-      border: 1px solid var(--card-border);
-      transition: transform 0.3s ease;
-    }
-
-    .brand-avatar:hover {
-      transform: scale(1.05);
-    }
-
-    header h1 {
-      font-size: 3.5rem;
-      font-weight: 700;
-      letter-spacing: -0.025em;
-      background: linear-gradient(135deg, #38bdf8 0%, #818cf8 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      margin: 0;
-    }
-
-    header p {
-      color: var(--text-muted);
-      font-size: 1.125rem;
-    }
-
-    /* Category Filter Navigation */
-    .filter-nav {
-      display: flex;
-      justify-content: center;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-      margin: 1.5rem auto 2.5rem;
-      padding: 0 1rem;
-    }
-
-    .filter-btn {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      color: var(--text-muted);
-      padding: 0.5rem 1.25rem;
-      border-radius: 9999px;
-      font-size: 0.875rem;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all 0.2s ease;
-    }
-
-    .filter-btn:hover, .filter-btn.active {
-      background: var(--accent);
-      color: #0f172a;
-      border-color: var(--accent);
-      font-weight: 600;
-    }
-
-    /* Grid Layout */
-    .container {
-      max-width: 1280px;
-      margin: 0 auto;
-      padding: 0 1.5rem 4rem;
-      flex: 1;
-    }
-
-    .app-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-      gap: 2rem;
-    }
-
-    /* App Card Styling */
-    .card {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 12px;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
-    }
-
-    .card:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 12px 24px -10px rgba(0, 0, 0, 0.5);
-      border-color: #475569;
-    }
-
-    .card-img-wrapper {
-      width: 100%;
-      height: 190px;
-      background: #090d16;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .card-img-wrapper img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
-    }
-
-    .card-body {
-      padding: 1.25rem;
-      display: flex;
-      flex-direction: column;
-      flex: 1;
-    }
-
-    .card-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 0.75rem;
-    }
-
-    .badge {
-      font-size: 0.75rem;
-      font-weight: 600;
-      padding: 0.25rem 0.6rem;
-      border-radius: 6px;
-      background: var(--badge-bg);
-      color: var(--badge-text);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-
-    .card-title {
-      font-size: 1.25rem;
-      font-weight: 600;
-      color: var(--text-main);
-      margin-bottom: 0.25rem;
-    }
-
-    .card-author {
-      font-size: 0.825rem;
-      color: var(--text-muted);
-      margin-bottom: 0.75rem;
-      font-style: italic;
-    }
-
-    .card-desc {
-      font-size: 0.9rem;
-      color: #cbd5e1;
-      margin-bottom: 1.5rem;
-      flex: 1;
-    }
-
-    .card-btn {
-      display: block;
-      text-align: center;
-      background: var(--accent);
-      color: #0f172a;
-      text-decoration: none;
-      font-weight: 600;
-      padding: 0.65rem 1rem;
-      border-radius: 6px;
-      transition: background 0.2s ease;
-    }
-
-    .card-btn:hover {
-      background: var(--accent-hover);
-      color: #ffffff;
-    }
-
-    /* Minimalist Footer */
-    footer {
-      background: #090d16;
-      border-top: 1px solid var(--card-border);
-      padding: 2.5rem 1.5rem;
-      font-size: 0.875rem;
-      color: var(--text-muted);
-      text-align: center;
-    }
-
-    .footer-content {
-      max-width: 650px;
-      margin: 0 auto;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 1.25rem;
-    }
-
-    .author-avatar {
-      width: 56px;
-      height: 56px;
-      border-radius: 50%;
-      object-fit: cover;
-      border: 2px solid var(--accent);
-      flex-shrink: 0;
-      box-shadow: 0 0 12px rgba(56, 189, 248, 0.2);
-    }
-
-    .author-info {
-      line-height: 1.6;
-      text-align: left;
-    }
-
-    footer a {
-      color: var(--accent);
-      text-decoration: none;
-    }
-
-    footer a:hover {
-      text-decoration: underline;
-    }
-
-    .footer-bottom {
-      margin-top: 1.25rem;
-      padding-top: 1rem;
-      border-top: 1px solid rgba(255, 255, 255, 0.05);
-    }
-
-    .credits-btn {
-      background: none;
-      border: none;
-      color: var(--text-muted);
-      font-size: 0.8rem;
-      cursor: pointer;
-      text-decoration: underline;
-      transition: color 0.2s ease;
-    }
-
-    .credits-btn:hover {
-      color: var(--accent);
-    }
-
-    /* Modal Dialog Styling */
-    .modal-backdrop {
-      position: fixed;
-      inset: 0;
-      background: rgba(15, 23, 42, 0.8);
-      backdrop-filter: blur(4px);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.25s ease;
-      z-index: 1000;
-      padding: 1.5rem;
-    }
-
-    .modal-backdrop.active {
-      opacity: 1;
-      pointer-events: auto;
-    }
-
-    .modal-content {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 12px;
-      max-width: 500px;
-      width: 100%;
-      padding: 2rem;
-      position: relative;
-      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
-      transform: translateY(10px);
-      transition: transform 0.25s ease;
-    }
-
-    .modal-backdrop.active .modal-content {
-      transform: translateY(0);
-    }
-
-    .modal-title {
-      font-size: 1.25rem;
-      font-weight: 600;
-      color: var(--text-main);
-      margin-bottom: 0.75rem;
-    }
-
-    .modal-body {
-      font-size: 0.925rem;
-      color: #cbd5e1;
-      line-height: 1.6;
-    }
-
-    .modal-close {
-      position: absolute;
-      top: 1rem;
-      right: 1rem;
-      background: none;
-      border: none;
-      color: var(--text-muted);
-      font-size: 1.5rem;
-      line-height: 1;
-      cursor: pointer;
-      padding: 0.25rem;
-      transition: color 0.2s ease;
-    }
-
-    .modal-close:hover {
-      color: var(--text-main);
-    }
-
-    @media (max-width: 500px) {
-      .footer-content {
-        flex-direction: column;
-        text-align: center;
-      }
-      .author-info {
-        text-align: center;
-      }
-      .brand-header {
-        flex-direction: column;
-        gap: 1rem;
-      }
-      header h1 {
-        font-size: 2.5rem;
-      }
-    }
-  </style>
+        /* Custom Equation Builder */
+        .eq-builder { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
+        .eq-input-group { display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: bold; }
+        #customEqInput { flex-grow: 1; padding: 8px; font-size: 16px; border: 1px solid var(--primary); border-radius: 4px; font-family: monospace; }
+        .math-keys { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 15px; }
+        .math-keys button { background-color: var(--secondary); color: black; border: 1px solid #aaa; padding: 5px 10px; font-family: monospace; }
+        .math-keys button:hover { background-color: #ddd; }
+        .math-keys .var-key { background-color: #d1ecf1; border-color: #bee5eb; }
+        .param-sliders { background: #f8f9fa; padding: 15px; border-radius: 4px; border: 1px solid #ddd; margin-bottom: 15px;}
+        .param-slider-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .param-slider-row input[type="number"] { width: 100px; padding: 5px; }
+        .param-slider-row input[type="range"] { flex-grow: 1; }
+    </style>
 </head>
 <body>
 
-  <header>
-    <div class="brand-header">
-      <img src="Logo_Version3.png" alt="GrubbSims Logo" class="brand-avatar">
-      <h1>GrubbSims</h1>
-    </div>
-    <p>Interactive Simulations & Virtual Labs For Chemistry, Physics, and Mathematics</p>
-  </header>
+    <h1>GrubbFit</h1>
+    <div class="subtitle">Mathematical Curve Fitting for STEM Data</div>
 
-  <nav class="filter-nav" id="filterNav">
-    <button class="filter-btn active" data-category="All">All (13)</button>
-    <button class="filter-btn" data-category="Chemistry">Chemistry</button>
-    <button class="filter-btn" data-category="Physics">Physics</button>
-    <button class="filter-btn" data-category="Math/Data Science">Math/Data Science</button>
-    <button class="filter-btn" data-category="Casual Game">Casual Games</button>
-  </nav>
-
-  <main class="container">
-    <div class="app-grid" id="appGrid"></div>
-  </main>
-
-  <footer>
-    <div class="footer-content">
-      <img 
-        src="./WTG-ProfilePic-Cropped-Warmer.jpg" 
-        alt="Tandy Grubbs" 
-        class="author-avatar"
-      >
-      <div class="author-info">
-        Developed by <strong>Tandy Grubbs</strong>, Chemistry Instructor at the 
-        <a href="https://www.ncssm.edu/directory/tandy-grubbs" target="_blank" rel="noopener">North Carolina School of Science and Mathematics</a>.
-        <br>
-        Connect on <a href="https://www.linkedin.com/in/dr-tandy-grubbs-6160529/" target="_blank" rel="noopener">LinkedIn</a>.
-      </div>
-    </div>
-    <div class="footer-bottom">
-      <button class="credits-btn" id="openCreditsBtn">Credits</button>
-    </div>
-  </footer>
-
-  <!-- Credits Modal -->
-  <div class="modal-backdrop" id="creditsModal" aria-hidden="true">
-    <div class="modal-content">
-      <button class="modal-close" id="closeCreditsBtn" aria-label="Close">&times;</button>
-      <h2 class="modal-title">Credits</h2>
-      <p class="modal-body">
-        Generative AI has been utilized to develop portions of the content available herein. Special thanks to student coauthors who have assisted in developing applications for GrubbSims. If you have any questions or suggestions for improving this content, please reach out.
-      </p>
-    </div>
-  </div>
-
-  <script>
-    // Embedded App Data (Ordered: Chemistry -> Physics -> Math/Data Science -> Casual Game)
-    const apps = [
-      // --- CHEMISTRY ---
-      {
-        category: "Chemistry",
-        title: "Chemical Reaction Dynamics - Langevin Model",
-        author: "Tandy Grubbs",
-        folder: "langevindynamics",
-        screenshot: "langevindynamics.png",
-        description: "Explore the dynamic, random motion of reactant molecules transitioning to product molecules over an energy barrier."
-      },
-      {
-        category: "Chemistry",
-        title: "Virtual Titration Lab",
-        author: "Tandy Grubbs",
-        folder: "virtualtitrator",
-        screenshot: "virtualtitrator.png",
-        description: "Titrate an unknown weak acid solution with a strong base to determine molarity and pKa."
-      },
-      {
-        category: "Chemistry",
-        title: "Organic Nomenclature",
-        author: "Tandy Grubbs",
-        folder: "organicnomenclature",
-        screenshot: "organicnomenclature.png",
-        description: "Master IUPAC naming conventions for organic chains up to 10 carbons, parent chains, functional groups, and substituents."
-      },
-      {
-        category: "Chemistry",
-        title: "Mahjong Chem",
-        author: "Tandy Grubbs",
-        folder: "mahjongchem",
-        screenshot: "mahjongchem.png",
-        description: "A tile-matching game matching polyatomic ion names with formulas, metric prefixes, and chemical symbols."
-      },
-      {
-        category: "Chemistry",
-        title: "Kinetic Molecular Gas Simulation",
-        author: "Tandy Grubbs",
-        folder: "kineticmoleculargas",
-        screenshot: "kineticmoleculargas.png",
-        description: "Explore kinetic molecular theory and how particle speeds and energy are impacted by temperature, mass, and volume."
-      },
-      {
-        category: "Chemistry",
-        title: "VSEPR",
-        author: "Ritika Mora and Gia Gia Vo",
-        folder: "vsepr",
-        screenshot: "vsepr.png",
-        description: "Identify shapes of chemical compounds, bonding domains, lone pairs, bond angles, and hybridization."
-      },
-      {
-        category: "Chemistry",
-        title: "Atomic Orbitals - Quantum Mechanics Sandbox",
-        author: "Tandy Grubbs",
-        folder: "atomicorbitals",
-        screenshot: "atomicorbitals.png",
-        description: "Visualize atomic orbital shapes, quantum numbers, and spectral absorption/emission wavelengths."
-      },
-      {
-        category: "Chemistry",
-        title: "Le Chatelier Principle",
-        author: "Brecken O'Leary",
-        folder: "lechatelier",
-        screenshot: "lechatelier.png",
-        description: "Apply stresses to chemical equilibrium and investigate how concentration, temperature, and pressure shift reaction quotients."
-      },
-
-      // --- PHYSICS ---
-      {
-        category: "Physics",
-        title: "Penduloodle",
-        author: "Tandy Grubbs",
-        folder: "penduloodle",
-        screenshot: "penduloodle.png",
-        description: "Create your own pendulum painting. Newtonian dynamic simulation generating intricate, swirling Spirographic patterns."
-      },
-
-      // --- MATH / DATA SCIENCE ---
-      {
-        category: "Math/Data Science",
-        title: "Mandelbrot Renderer",
-        author: "Tandy Grubbs",
-        folder: "mandelbrot",
-        screenshot: "mandelbrot.png",
-        description: "Graphically zoom in and explore the infinite, repeating detail of the complex Mandelbrot fractal set."
-      },
-
-      // --- CASUAL GAMES ---
-      {
-        category: "Casual Game",
-        title: "Sue's Cozy Goat Farm",
-        author: "Tandy Grubbs",
-        folder: "suesgoatfarm",
-        screenshot: "suesgoatfarm.png",
-        description: "Explore your surroundings, find goats, and bring them back to the barn before nightfall. Beware of bears."
-      },
-      {
-        category: "Casual Game",
-        title: "Mahjong Solitaire",
-        author: "Tandy Grubbs",
-        folder: "mahjong",
-        screenshot: "mahjong.png",
-        description: "Mahjong Solitaire, the classic tile-matching puzzle game."
-      },
-      {
-        category: "Casual Game",
-        title: "Poker Solitaire",
-        author: "Tandy Grubbs",
-        folder: "solitaire",
-        screenshot: "solitaire.png",
-        description: "The classic Poker card stacking solitaire game played with a standard pack of 52 playing cards."
-      }
-    ];
-
-    const appGrid = document.getElementById('appGrid');
-    const filterBtns = document.querySelectorAll('.filter-btn');
-
-    function renderApps(filterCategory = 'All') {
-      appGrid.innerHTML = '';
-      const filtered = filterCategory === 'All' 
-        ? apps 
-        : apps.filter(app => app.category === filterCategory);
-
-      filtered.forEach(app => {
-        const imagePath = `./${app.folder}/${app.screenshot}`;
-        const appUrl = `./${app.folder}/`;
-
-        const cardHtml = `
-          <div class="card">
-            <div class="card-img-wrapper">
-              <img src="${imagePath}" alt="${app.title}" onerror="this.src='https://via.placeholder.com/400x200/1e293b/94a3b8?text=${encodeURIComponent(app.title)}'">
+    <div class="grid-container">
+        <!-- AREA 1: Data Input -->
+        <div class="panel">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 style="margin: 0;">1. Data Input</h3>
+                <button class="btn-info" onclick="document.getElementById('infoModal').style.display='block'">(?) Input File Format Info</button>
             </div>
-            <div class="card-body">
-              <div class="card-header">
-                <span class="badge">${app.category}</span>
-              </div>
-              <h2 class="card-title">${app.title}</h2>
-              <p class="card-author">By ${app.author}</p>
-              <p class="card-desc">${app.description}</p>
-              <a href="${appUrl}" class="card-btn">Launch Simulation →</a>
+            
+            <input type="file" id="csvFileInput" accept=".csv" style="margin-bottom: 15px;">
+            
+            <div class="table-container">
+                <table id="dataTable">
+                    <thead>
+                        <tr>
+                            <th><input type="text" id="xTitle" value="X Data" title="Edit X-Axis Title"></th>
+                            <th><input type="text" id="yTitle" value="Y Data" title="Edit Y-Axis Title"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                        <tr><td><input type="text" value="1"></td><td><input type="text" value="2.1"></td></tr>
+                        <tr><td><input type="text" value="2"></td><td><input type="text" value="4.0"></td></tr>
+                        <tr><td><input type="text" value="3"></td><td><input type="text" value="6.2"></td></tr>
+                        <tr><td><input type="text" value="4"></td><td><input type="text" value="7.8"></td></tr>
+                        <tr><td><input type="text" value="5"></td><td><input type="text" value="10.1"></td></tr>
+                    </tbody>
+                </table>
             </div>
-          </div>
-        `;
-        appGrid.innerHTML += cardHtml;
-      });
-    }
+            <button onclick="addRow()">+ Add Row</button>
+            <button onclick="clearData()" style="background-color: #cc0000;">Clear All</button>
+        </div>
 
-    // Filter Button Event Listeners
-    filterBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        filterBtns.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        renderApps(btn.dataset.category);
-      });
-    });
+        <!-- AREA 2 & 3: Graph and UI Controls -->
+        <div class="panel" style="grid-row: span 2;">
+            <h3 style="margin-top: 0;">2. Graph & Fit</h3>
+            <div class="controls" style="margin-bottom: 20px;">
+                <div class="btn-group" style="align-items: center;">
+                    <label for="fitType"><strong>Mathematical Model:</strong></label>
+                    <select id="fitType">
+                        <option value="linear">Linear (y = mx + b)</option>
+                        <option value="exponential">Exponential (y = A e^(Bx))</option>
+                        <option value="logarithmic">Logarithmic (y = A + B ln(x))</option>
+                        <option value="power">Power (y = A x^B)</option>
+                        <option value="polynomial-2">Polynomial (Degree 2)</option>
+                        <option value="polynomial-3">Polynomial (Degree 3)</option>
+                        <option value="polynomial-4">Polynomial (Degree 4)</option>
+                        <option value="custom" style="font-weight: bold;">Custom Model (Interactive)...</option>
+                    </select>
+                    <button onclick="performFit()" id="calcFitBtn">Calculate Fit</button>
+                </div>
+                <div class="btn-group">
+                    <button onclick="downloadCSV()">Download Results (CSV)</button>
+                    <button onclick="saveImage()">Save Graph Image</button>
+                </div>
+            </div>
+            
+            <div id="plotArea" style="width: 100%; height: 500px;"></div>
+        </div>
 
-    // Credits Modal Logic
-    const creditsModal = document.getElementById('creditsModal');
-    const openCreditsBtn = document.getElementById('openCreditsBtn');
-    const closeCreditsBtn = document.getElementById('closeCreditsBtn');
+        <!-- AREA 4: Statistics Summary -->
+        <div class="panel">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 style="margin: 0;">3. Regression Statistics</h3>
+                <button class="btn-info" onclick="document.getElementById('statsModal').style.display='block'">(?) Background Info</button>
+            </div>
+            <div class="stats-grid" id="statsArea">
+                <div class="stat-box full-width"><em>Run a fit to view parameters and statistics.</em></div>
+            </div>
+        </div>
+    </div>
 
-    openCreditsBtn.addEventListener('click', () => {
-      creditsModal.classList.add('active');
-      creditsModal.setAttribute('aria-hidden', 'false');
-    });
+    <!-- Info Modal 1: Input Format -->
+    <div id="infoModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="document.getElementById('infoModal').style.display='none'">&times;</span>
+            <h3 style="margin-top:0; color: var(--primary);">Input File Format Info</h3>
+            <p>To upload data smoothly, ensure your CSV file follows these rules:</p>
+            <ul>
+                <li><strong>Column 1:</strong> X values (independent variable)</li>
+                <li><strong>Column 2:</strong> Y values (dependent variable)</li>
+                <li><strong>Headers (Optional):</strong> If the first row contains text (e.g., "Time", "Velocity"), the app will automatically detect it and set them as your axis titles.</li>
+                <li><strong>Scientific Notation:</strong> Supported automatically (e.g., <code>1.5e-3</code>).</li>
+            </ul>
+        </div>
+    </div>
 
-    closeCreditsBtn.addEventListener('click', () => {
-      creditsModal.classList.remove('active');
-      creditsModal.setAttribute('aria-hidden', 'true');
-    });
+    <!-- Info Modal 2: Statistics Background -->
+    <div id="statsModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="document.getElementById('statsModal').style.display='none'">&times;</span>
+            <h3 style="margin-top:0; color: var(--primary);">Regression Analysis Background</h3>
+            <p><strong>Regression Analysis</strong> is a statistical process used to estimate the relationships between a dependent variable (Y) and an independent variable (X). The goal is to find the mathematical model that best "fits" the observed data.</p>
+            <ul>
+                <li><strong>R<sup>2</sup> (Coefficient of Determination):</strong> A measure from 0 to 1 indicating how well the model explains the variability of the data. An R<sup>2</sup> closer to 1 implies a tighter fit.</li>
+                <li><strong>Sum of Residuals Squared (SSR):</strong> The sum of the squares of the vertical distances (residuals) between each raw data point and the fitted curve. The fitting process attempts to minimize this value.</li>
+                <li><strong>Standard Error of the Estimate (S<sub>e</sub>):</strong> Represents the average distance that the observed values fall from the regression line. It provides an absolute measure of the typical error in the model's predictions.</li>
+                <li><strong>Parameter Standard Deviation:</strong> Measures the precision of the estimated fitting parameters. A smaller standard deviation indicates greater confidence in that specific parameter's value. <em>Note: Custom models use manual fitting, so parameter uncertainties are not mathematically derived here.</em></li>
+            </ul>
+        </div>
+    </div>
 
-    creditsModal.addEventListener('click', (e) => {
-      if (e.target === creditsModal) {
-        creditsModal.classList.remove('active');
-        creditsModal.setAttribute('aria-hidden', 'true');
-      }
-    });
+    <!-- Custom Function Builder Modal -->
+    <div id="customFitModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="document.getElementById('customFitModal').style.display='none'">&times;</span>
+            <h3 style="margin-top:0; color: var(--primary);">Build Custom Mathematical Model</h3>
+            <p style="font-size: 14px; color: #555;">Construct a function using mathematical operators. Define unknown parameters using letters (e.g., <strong>a, b, c</strong>). Adjust the parameters below to manually minimize the residuals.</p>
+            
+            <div class="eq-builder">
+                <div class="math-keys" id="mathKeys">
+                    <button onclick="insertEq(' + ')">+</button>
+                    <button onclick="insertEq(' - ')">-</button>
+                    <button onclick="insertEq(' * ')">&times;</button>
+                    <button onclick="insertEq(' / ')">&divide;</button>
+                    <button onclick="insertEq(' ^ ')">^</button>
+                    <button onclick="insertEq(' ( ')">(</button>
+                    <button onclick="insertEq(' ) ')">)</button>
+                    <button onclick="insertEq('sin(')">sin()</button>
+                    <button onclick="insertEq('cos(')">cos()</button>
+                    <button onclick="insertEq('exp(')">exp()</button>
+                    <button onclick="insertEq('log(')">ln()</button>
+                    <button onclick="insertEq('sqrt(')">sqrt()</button>
+                    <button class="var-key" onclick="insertEq('x')">x (Data)</button>
+                    <button class="var-key" onclick="insertEq('a')">a</button>
+                    <button class="var-key" onclick="insertEq('b')">b</button>
+                    <button class="var-key" onclick="insertEq('c')">c</button>
+                </div>
+                
+                <div class="eq-input-group">
+                    <span>y = </span>
+                    <input type="text" id="customEqInput" value="a * sin(b * x) + c" placeholder="e.g. a * exp(-b * x)">
+                    <button onclick="parseCustomEquation()" style="background-color: var(--accent);">Initialize Variables</button>
+                </div>
 
-    // Initial Render
-    renderApps();
-  </script>
+                <div id="paramSlidersContainer" class="param-sliders" style="display: none;">
+                    <h4 style="margin-top: 0;">Adjust Parameters</h4>
+                    <div id="sliderList"></div>
+                    <div style="text-align: right; margin-top: 10px;">
+                        <button onclick="document.getElementById('customFitModal').style.display='none'">Close & View Graph</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentFitResult = null;
+        let currentData = [];
+        let customCompiledEquation = null;
+        let customParameters = {}; // Stores {a: 1, b: 2}
+
+        // Helper to insert text at cursor in custom equation input
+        function insertEq(text) {
+            const input = document.getElementById('customEqInput');
+            const start = input.selectionStart;
+            const end = input.selectionEnd;
+            input.value = input.value.substring(0, start) + text + input.value.substring(end);
+            input.focus();
+            input.selectionStart = input.selectionEnd = start + text.length;
+        }
+
+        // Parse custom equation using math.js and find variables
+        function parseCustomEquation() {
+            const eqStr = document.getElementById('customEqInput').value;
+            try {
+                const node = math.parse(eqStr);
+                customCompiledEquation = node.compile();
+                
+                // Find all unique symbols that aren't 'x' and aren't math functions
+                let symbols = new Set();
+                node.traverse(function (n) {
+                    if (n.isSymbolNode && n.name !== 'x' && typeof math[n.name] !== 'function') {
+                        symbols.add(n.name);
+                    }
+                });
+
+                const sliderList = document.getElementById('sliderList');
+                sliderList.innerHTML = '';
+                customParameters = {};
+
+                if (symbols.size === 0) {
+                    sliderList.innerHTML = '<p>No variables (like a, b, c) detected. Add some to adjust!</p>';
+                } else {
+                    symbols.forEach(sym => {
+                        customParameters[sym] = 1.0; // Initial guess
+                        
+                        const row = document.createElement('div');
+                        row.className = 'param-slider-row';
+                        row.innerHTML = `
+                            <strong>${sym} =</strong> 
+                            <input type="number" id="num_${sym}" value="1.0" step="any" oninput="syncParam('${sym}', this.value)">
+                            <button onclick="stepParam('${sym}', -0.1)" class="btn-info">-</button>
+                            <button onclick="stepParam('${sym}', 0.1)" class="btn-info">+</button>
+                        `;
+                        sliderList.appendChild(row);
+                    });
+                }
+                
+                document.getElementById('paramSlidersContainer').style.display = 'block';
+                runCustomFit(); // Initial draw
+
+            } catch (error) {
+                alert("Invalid mathematical expression. Please check your equation syntax.\n\nError: " + error.message);
+            }
+        }
+
+        // Sync inputs for custom parameters
+        function syncParam(sym, val) {
+            customParameters[sym] = parseFloat(val) || 0;
+            runCustomFit();
+        }
+
+        function stepParam(sym, stepSize) {
+            const input = document.getElementById(`num_${sym}`);
+            let val = parseFloat(input.value) || 0;
+            val += stepSize;
+            input.value = val.toPrecision(4);
+            syncParam(sym, val);
+        }
+
+        // Matrix inversion function to calculate parameter Standard Deviations
+        function invertMatrix(m) {
+            let n = m.length;
+            let a = m.map(row => [...row]);
+            let i = Array.from({length: n}, (_, r) => Array.from({length: n}, (_, c) => r === c ? 1 : 0));
+            for(let k=0; k<n; k++) {
+                let temp = a[k][k];
+                if(Math.abs(temp) < 1e-10) return null; // Singular matrix
+                for(let j=0; j<n; j++) { a[k][j] /= temp; i[k][j] /= temp; }
+                for(let r=0; r<n; r++) {
+                    if(r === k) continue;
+                    let factor = a[r][k];
+                    for(let j=0; j<n; j++) { a[r][j] -= factor*a[k][j]; i[r][j] -= factor*i[k][j]; }
+                }
+            }
+            return i;
+        }
+
+        function getParameterStdevs(data, fitType, result) {
+            let n = data.length;
+            let p = result.equation.length;
+            let X = [];
+            let transformedSSR = 0;
+
+            data.forEach(pt => {
+                let x = pt[0], y = pt[1], row = [];
+                if(fitType === 'linear') { row = [x, 1]; transformedSSR += Math.pow(y - (result.equation[0]*x + result.equation[1]), 2); }
+                else if(fitType === 'exponential') { row = [1, x]; transformedSSR += Math.pow(Math.log(y) - (Math.log(result.equation[0]) + result.equation[1]*x), 2); }
+                else if(fitType === 'logarithmic') { row = [1, Math.log(x)]; transformedSSR += Math.pow(y - (result.equation[0] + result.equation[1]*Math.log(x)), 2); }
+                else if(fitType === 'power') { row = [1, Math.log(x)]; transformedSSR += Math.pow(Math.log(y) - (Math.log(result.equation[0]) + result.equation[1]*Math.log(x)), 2); }
+                else if(fitType.startsWith('polynomial')) {
+                    let deg = parseInt(fitType.split('-')[1]);
+                    for(let i=deg; i>=0; i--) row.push(Math.pow(x, i));
+                    let predY = 0;
+                    for(let i=0; i<=deg; i++) predY += result.equation[i] * Math.pow(x, deg-i);
+                    transformedSSR += Math.pow(y - predY, 2);
+                }
+                X.push(row);
+            });
+
+            let XT = X[0].map((_, colIndex) => X.map(row => row[colIndex]));
+            let XTX = XT.map(row => XT[0].map((_, j) => row.reduce((sum, val, k) => sum + val * X[k][j], 0)));
+            let XTX_inv = invertMatrix(XTX);
+            
+            if(!XTX_inv) return Array(p).fill('Singular');
+
+            let MSE = transformedSSR / Math.max(1, (n - p));
+            let stdevs = [];
+            for(let i=0; i<p; i++){
+                let variance = MSE * XTX_inv[i][i];
+                stdevs.push(variance >= 0 ? Math.sqrt(variance) : 0);
+            }
+
+            if(fitType === 'exponential' || fitType === 'power') { stdevs[0] = result.equation[0] * stdevs[0]; }
+            return stdevs;
+        }
+
+        function addRow() {
+            const tbody = document.getElementById('tableBody');
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td><input type="text"></td><td><input type="text"></td>`;
+            tbody.appendChild(tr);
+        }
+
+        function clearData() {
+            document.getElementById('tableBody').innerHTML = '';
+            for(let i=0; i<5; i++) addRow();
+        }
+
+        document.getElementById('csvFileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            Papa.parse(file, {
+                complete: function(results) {
+                    let dataRows = results.data;
+                    if (dataRows.length > 0 && isNaN(parseFloat(dataRows[0][0])) && isNaN(parseFloat(dataRows[0][1]))) {
+                        document.getElementById('xTitle').value = dataRows[0][0] || 'X Data';
+                        document.getElementById('yTitle').value = dataRows[0][1] || 'Y Data';
+                        dataRows = dataRows.slice(1);
+                    }
+                    const tbody = document.getElementById('tableBody');
+                    tbody.innerHTML = '';
+                    dataRows.forEach(row => {
+                        if (row.length >= 2 && !isNaN(parseFloat(row[0])) && !isNaN(parseFloat(row[1]))) {
+                            const tr = document.createElement('tr');
+                            tr.innerHTML = `<td><input type="text" value="${row[0]}"></td><td><input type="text" value="${row[1]}"></td>`;
+                            tbody.appendChild(tr);
+                        }
+                    });
+                }
+            });
+        });
+
+        function getTableData() {
+            const rows = document.querySelectorAll('#tableBody tr');
+            const data = [];
+            rows.forEach(row => {
+                const inputs = row.querySelectorAll('input');
+                const x = parseFloat(inputs[0].value);
+                const y = parseFloat(inputs[1].value);
+                if (!isNaN(x) && !isNaN(y)) data.push([x, y]);
+            });
+            return data.sort((a, b) => a[0] - b[0]);
+        }
+
+        function performFit() {
+            const fitType = document.getElementById('fitType').value;
+            if (fitType === 'custom') {
+                document.getElementById('customFitModal').style.display = 'block';
+                return;
+            }
+
+            const data = getTableData();
+            if (data.length < 2) { alert("Please enter at least 2 valid data points."); return; }
+
+            let result;
+            let options = { precision: 6 };
+
+            if (fitType.startsWith('polynomial')) {
+                const degree = parseInt(fitType.split('-')[1]);
+                result = regression.polynomial(data, { order: degree, precision: 6 });
+            } else {
+                result = regression[fitType](data, options);
+            }
+
+            currentData = data;
+            currentFitResult = result;
+            currentFitResult.type = fitType;
+
+            let ssr = 0;
+            let resX = [], resY = [], predictedY = [], rawX = [], rawY = [];
+
+            data.forEach((point, index) => {
+                const x = point[0], actualY = point[1], predY = result.points[index][1];
+                rawX.push(x); rawY.push(actualY); predictedY.push(predY);
+                ssr += Math.pow(actualY - predY, 2);
+                resX.push(x, x, null); resY.push(actualY, predY, null);
+            });
+
+            let p = result.equation.length;
+            let standardError = Math.sqrt(ssr / Math.max(1, (data.length - p)));
+            let paramStdevs = getParameterStdevs(data, fitType, result);
+
+            updateStats(result, ssr, standardError, fitType, paramStdevs);
+            drawPlot(rawX, rawY, predictedY, resX, resY, result.string, result.r2, fitType);
+        }
+
+        // Logic for evaluating and drawing the Interactive Custom Fit
+        function runCustomFit() {
+            if (!customCompiledEquation) return;
+            const data = getTableData();
+            if (data.length < 2) return;
+
+            let ssr = 0, sst = 0, meanY = 0;
+            let resX = [], resY = [], predictedY = [], rawX = [], rawY = [];
+            
+            data.forEach(pt => meanY += pt[1]);
+            meanY /= data.length;
+
+            data.forEach(pt => {
+                const x = pt[0], actualY = pt[1];
+                let scope = Object.assign({ x: x }, customParameters);
+                let predY = 0;
+                
+                try {
+                    predY = customCompiledEquation.evaluate(scope);
+                } catch(e) { predY = NaN; }
+
+                rawX.push(x); rawY.push(actualY); predictedY.push(predY);
+                
+                if(!isNaN(predY)){
+                    ssr += Math.pow(actualY - predY, 2);
+                    sst += Math.pow(actualY - meanY, 2);
+                    resX.push(x, x, null); resY.push(actualY, predY, null);
+                }
+            });
+
+            const r2 = sst === 0 ? 0 : (1 - (ssr / sst));
+            const p = Object.keys(customParameters).length;
+            const standardError = Math.sqrt(ssr / Math.max(1, (data.length - p)));
+
+            currentData = data;
+            
+            // Format mock 'result' object for custom fit
+            let eqString = document.getElementById('customEqInput').value;
+            currentFitResult = { 
+                type: 'custom', 
+                string: eqString, 
+                r2: r2.toFixed(4),
+                points: predictedY.map((y, i) => [rawX[i], y])
+            };
+
+            const statsArea = document.getElementById('statsArea');
+            let paramHTML = `<strong>Manual Parameters:</strong><br><div style="margin-top:8px;">`;
+            for (const [key, value] of Object.entries(customParameters)) {
+                paramHTML += `<div class="param-row"><span>${key}: ${value}</span> <span>&plusmn; N/A (Manual Fit)</span></div>`;
+            }
+            paramHTML += `</div>`;
+
+            statsArea.innerHTML = `
+                <div class="stat-box full-width"><strong>Model:</strong> Custom Interactive Model</div>
+                <div class="stat-box full-width"><strong>Equation:</strong> y = ${eqString}</div>
+                <div class="stat-box">${paramHTML}</div>
+                <div class="stat-box">
+                    <strong>R<sup>2</sup>:</strong> ${r2.toFixed(4)}<br><br>
+                    <strong>Sum of Res. Sq. (SSR):</strong> ${ssr.toPrecision(5)}<br><br>
+                    <strong>Std. Error of Estimate (S<sub>e</sub>):</strong> ${standardError.toPrecision(5)}
+                </div>
+            `;
+
+            drawPlot(rawX, rawY, predictedY, resX, resY, eqString, r2.toFixed(4), 'Custom');
+        }
+
+        function updateStats(result, ssr, standardError, fitType, paramStdevs) {
+            const statsArea = document.getElementById('statsArea');
+            let paramSymbols = [];
+            
+            if(fitType === 'linear') paramSymbols = ['m (slope)', 'b (intercept)'];
+            else if(fitType === 'exponential' || fitType === 'logarithmic' || fitType === 'power') paramSymbols = ['A', 'B'];
+            else if(fitType.startsWith('polynomial')) {
+                let deg = parseInt(fitType.split('-')[1]);
+                for(let i=deg; i>=0; i--) paramSymbols.push(`C<sub>${i}</sub>`);
+            }
+
+            let paramHTML = `<strong>Parameters & Std. Dev:</strong><br><div style="margin-top:8px;">`;
+            result.equation.forEach((coef, i) => {
+                let sdStr = typeof paramStdevs[i] === 'number' ? paramStdevs[i].toPrecision(4) : paramStdevs[i];
+                paramHTML += `<div class="param-row"><span>${paramSymbols[i]}: ${coef.toPrecision(5)}</span> <span>&plusmn; ${sdStr}</span></div>`;
+            });
+            paramHTML += `</div>`;
+
+            const modelName = document.getElementById('fitType').options[document.getElementById('fitType').selectedIndex].text;
+
+            statsArea.innerHTML = `
+                <div class="stat-box full-width"><strong>Model:</strong> ${modelName}</div>
+                <div class="stat-box full-width"><strong>Equation:</strong> y = ${result.string}</div>
+                <div class="stat-box">${paramHTML}</div>
+                <div class="stat-box">
+                    <strong>R<sup>2</sup>:</strong> ${result.r2}<br><br>
+                    <strong>Sum of Res. Sq. (SSR):</strong> ${ssr.toPrecision(5)}<br><br>
+                    <strong>Std. Error of Estimate (S<sub>e</sub>):</strong> ${standardError.toPrecision(5)}
+                </div>
+            `;
+        }
+
+        function drawPlot(rawX, rawY, predY, resX, resY, eqStr, r2Str, modelName) {
+            const xLabel = document.getElementById('xTitle').value || 'X Axis';
+            const yLabel = document.getElementById('yTitle').value || 'Y Axis';
+            let titlePrefix = modelName === 'Custom' ? 'Custom' : modelName.split(' ')[0];
+
+            // Sort arrays together by X for a smooth line plot
+            let sortedIndices = Array.from(rawX.keys()).sort((a,b) => rawX[a] - rawX[b]);
+            let sortedRawX = sortedIndices.map(i => rawX[i]);
+            let sortedPredY = sortedIndices.map(i => predY[i]);
+
+            const traceData = { x: rawX, y: rawY, mode: 'markers', type: 'scatter', name: 'Raw Data', marker: { size: 10, color: 'blue', symbol: 'circle-open', line: {width: 2} } };
+            const traceFit = { x: sortedRawX, y: sortedPredY, mode: 'lines', type: 'scatter', name: 'Fitted Curve', line: { color: 'black', width: 2 } };
+            const traceRes = { x: resX, y: resY, mode: 'lines', type: 'scatter', name: 'Residuals', line: { color: 'red', width: 1, dash: 'dot' }, hoverinfo: 'skip' };
+
+            const layout = {
+                title: `${yLabel} vs. ${xLabel}`,
+                xaxis: { title: xLabel },
+                yaxis: { title: yLabel },
+                margin: { l: 60, r: 20, t: 50, b: 50 },
+                hovermode: 'closest',
+                annotations: [{
+                    xref: 'paper', yref: 'paper', x: 0.02, y: 0.98,
+                    xanchor: 'left', yanchor: 'top',
+                    text: `<b>${titlePrefix} Fit:</b><br>y = ${eqStr}<br>R² = ${r2Str}`,
+                    showarrow: false, font: { size: 14, color: 'black' },
+                    bgcolor: 'rgba(255, 255, 255, 0.9)', bordercolor: '#ccc', borderpad: 8
+                }]
+            };
+
+            Plotly.newPlot('plotArea', [traceRes, traceData, traceFit], layout, {responsive: true});
+        }
+
+        function saveImage() {
+            const plot = document.getElementById('plotArea');
+            if (plot.data) {
+                Plotly.downloadImage(plot, {format: 'png', width: 800, height: 600, filename: 'GrubbFit_Graph'});
+            } else {
+                alert("Please calculate a fit first.");
+            }
+        }
+
+        function downloadCSV() {
+            if (!currentFitResult) { alert("Please calculate a fit first."); return; }
+            let csvContent = "data:text/csv;charset=utf-8,";
+            csvContent += "Model Type," + currentFitResult.type + "\n";
+            csvContent += "Equation," + currentFitResult.string.replace(/,/g, '') + "\n";
+            csvContent += "R-squared," + currentFitResult.r2 + "\n\n";
+            
+            const xTitle = document.getElementById('xTitle').value;
+            const yTitle = document.getElementById('yTitle').value;
+            csvContent += `${xTitle} (X),${yTitle} (Raw Y),Predicted Y,Residual\n`;
+            
+            currentData.forEach((point, index) => {
+                const x = point[0], y = point[1];
+                const predY = currentFitResult.points[index][1];
+                csvContent += `${x},${y},${predY},${y - predY}\n`;
+            });
+
+            const link = document.createElement("a");
+            link.setAttribute("href", encodeURI(csvContent));
+            link.setAttribute("download", "GrubbFit_Results.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        window.onload = function() {
+            Plotly.newPlot('plotArea', [], {title: 'Enter data and calculate fit to view graph.'});
+            
+            // Listen for dropdown changes to automatically trigger the custom modal
+            document.getElementById('fitType').addEventListener('change', function() {
+                if (this.value === 'custom') {
+                    document.getElementById('customFitModal').style.display = 'block';
+                }
+            });
+        };
+    </script>
 </body>
 </html>
