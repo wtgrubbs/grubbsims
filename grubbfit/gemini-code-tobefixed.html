@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GrubbFit - Data Analysis</title>
+    <!-- External Libraries -->
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/regression/2.0.1/regression.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.11.0/math.min.js"></script>
+    
+    <style>
+        :root {
+            --primary: #003366; 
+            --secondary: #f4f4f4;
+            --border: #ccc;
+            --accent: #28a745;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f9f9f9;
+            color: #333;
+        }
+        h1 {
+            color: var(--primary);
+            text-align: center;
+            margin-bottom: 5px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 20px;
+            font-style: italic;
+        }
+        .grid-container {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            grid-template-rows: auto auto;
+            gap: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .panel {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            position: relative;
+        }
+        
+        /* Table & Inputs */
+        .table-container {
+            max-height: 400px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+        }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid var(--border); padding: 8px; text-align: center; }
+        th { background-color: var(--secondary); padding: 0; }
+        th input { 
+            width: 100%; box-sizing: border-box; background: transparent; 
+            border: none; padding: 8px; text-align: center; font-weight: bold; 
+        }
+        th input:focus { outline: 2px solid var(--primary); background: white; }
+        td input[type="text"] { width: 90%; padding: 4px; border: none; text-align: center; }
+        td input[type="text"]:focus { outline: 1px solid var(--primary); }
+        
+        /* Controls */
+        .controls { display: flex; flex-direction: column; gap: 15px; }
+        .btn-group { display: flex; gap: 10px; flex-wrap: wrap; }
+        button, select, input[type="file"]::file-selector-button {
+            background-color: var(--primary); color: white; border: none;
+            padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 14px;
+        }
+        button:hover, input[type="file"]::file-selector-button:hover { background-color: #002244; }
+        select { background-color: white; color: #333; border: 1px solid var(--border); }
+        .btn-info { background-color: #17a2b8; padding: 4px 8px; font-size: 12px; }
+        .btn-info:hover { background-color: #138496; }
+        .btn-symbol { background-color: #6c757d; padding: 4px 8px; font-size: 12px; }
+        .btn-symbol:hover { background-color: #5a6268; }
+
+        /* Stats */
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 14px; }
+        .stat-box { background: var(--secondary); padding: 10px; border-radius: 4px; border-left: 4px solid var(--primary); }
+        .full-width { grid-column: span 2; }
+        .param-row { display: flex; justify-content: space-between; margin-bottom: 4px; border-bottom: 1px dashed #ddd; padding-bottom: 2px; align-items: center;}
+        
+        /* Modals */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
+        .modal-content { background-color: #fff; margin: 5% auto; padding: 20px; border-radius: 8px; width: 90%; max-width: 600px; position: relative; max-height: 90vh; overflow-y: auto;}
+        .close { color: #aaa; float: right; font-size: 24px; font-weight: bold; cursor: pointer; line-height: 20px; }
+        .close:hover { color: black; }
+        .modal-content li { margin-bottom: 10px; }
+
+        /* Equation / Symbol Builders */
+        .eq-builder { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
+        .eq-input-group { display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: bold; }
+        #customEqInput { flex-grow: 1; padding: 8px; font-size: 16px; border: 1px solid var(--primary); border-radius: 4px; font-family: monospace; }
+        .math-keys { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 15px; }
+        .math-keys button { background-color: var(--secondary); color: black; border: 1px solid #aaa; padding: 5px 10px; font-family: monospace; font-size: 16px; min-width: 35px;}
+        .math-keys button:hover { background-color: #ddd; }
+        .math-keys .var-key { background-color: #d1ecf1; border-color: #bee5eb; }
+        
+        .param-sliders { background: #f8f9fa; padding: 15px; border-radius: 4px; border: 1px solid #ddd; margin-bottom: 15px;}
+        .param-slider-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .param-slider-row input[type="number"] { width: 100px; padding: 5px; }
+        .param-slider-row input[type="range"] { flex-grow: 1; }
+
+        /* Force Origin Checkbox */
+        .checkbox-container { margin-top: 5px; font-size: 14px; }
+        .checkbox-container input { margin-right: 5px; cursor: pointer;}
+        .checkbox-container label { cursor: pointer; }
+        .checkbox-container.disabled { color: #aaa; }
+    </style>
+</head>
+<body>
+
+    <h1>GrubbFit</h1>
+    <div class="subtitle">Mathematical Curve Fitting for STEM Data</div>
+
+    <div class="grid-container">
+        <!-- AREA 1: Data Input -->
+        <div class="panel">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 style="margin: 0;">1. Data Input</h3>
+                <div style="display: flex; gap: 5px;">
+                    <button class="btn-symbol" onclick="document.getElementById('symbolModal').style.display='block'" title="Insert Greek letters or superscripts">[α] Symbols</button>
+                    <button class="btn-info" onclick="document.getElementById('infoModal').style.display='block'">(?) Info</button>
+                </div>
+            </div>
+            
+            <input type="file" id="csvFileInput" accept=".csv" style="margin-bottom: 15px;">
+            
+            <div class="table-container">
+                <table id="dataTable">
+                    <thead>
+                        <tr>
+                            <th><input type="text" id="xTitle" value="X Data" title="Edit X-Axis Title"></th>
+                            <th><input type="text" id="yTitle" value="Y Data" title="Edit Y-Axis Title"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                        <tr><td><input type="text" value="1"></td><td><input type="text" value="2.1"></td></tr>
+                        <tr><td><input type="text" value="2"></td><td><input type="text" value="4.0"></td></tr>
+                        <tr><td><input type="text" value="3"></td><td><input type="text" value="6.2"></td></tr>
+                        <tr><td><input type="text" value="4"></td><td><input type="text" value="7.8"></td></tr>
+                        <tr><td><input type="text" value="5"></td><td><input type="text" value="10.1"></td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <button onclick="addRow()">+ Add Row</button>
+            <button onclick="clearData()" style="background-color: #cc0000;">Clear All</button>
+        </div>
+
+        <!-- AREA 2 & 3: Graph and UI Controls -->
+        <div class="panel" style="grid-row: span 2;">
+            <h3 style="margin-top: 0;">2. Graph & Fit</h3>
+            <div class="controls" style="margin-bottom: 20px;">
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <div class="btn-group" style="align-items: center;">
+                        <label for="fitType"><strong>Mathematical Model:</strong></label>
+                        <select id="fitType">
+                            <option value="linear">Linear (y = mx + b)</option>
+                            <option value="exponential">Exponential (y = A e^(Bx))</option>
+                            <option value="logarithmic">Logarithmic (y = A + B ln(x))</option>
+                            <option value="power">Power (y = A x^B)</option>
+                            <option value="polynomial-2">Polynomial (Degree 2)</option>
+                            <option value="polynomial-3">Polynomial (Degree 3)</option>
+                            <option value="polynomial-4">Polynomial (Degree 4)</option>
+                            <option value="custom" style="font-weight: bold;">Custom Model (Interactive)...</option>
+                        </select>
+                        <button onclick="performFit()" id="calcFitBtn">Calculate Fit</button>
+                    </div>
+                    <div class="checkbox-container" id="forceOriginContainer">
+                        <label><input type="checkbox" id="forceOrigin"> Force fit through origin (y-intercept = 0)</label>
+                    </div>
+                </div>
+                
+                <div class="btn-group" style="margin-top: 5px;">
+                    <button onclick="downloadCSV()">Download Results (CSV)</button>
+                    <button onclick="saveImage()">Save Graph Image</button>
+                </div>
+            </div>
+            
+            <div id="plotArea" style="width: 100%; height: 500px;"></div>
+        </div>
+
+        <!-- AREA 4: Statistics Summary -->
+        <div class="panel">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 style="margin: 0;">3. Regression Statistics</h3>
+                <button class="btn-info" onclick="document.getElementById('statsModal').style.display='block'">(?) Background Info</button>
+            </div>
+            <div class="stats-grid" id="statsArea">
+                <div class="stat-box full-width"><em>Run a fit to view parameters and statistics.</em></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Symbol Palette Modal -->
+    <div id="symbolModal" class="modal" style="z-index: 1005;">
+        <div class="modal-content" style="max-width: 450px;">
+            <span class="close" onclick="document.getElementById('symbolModal').style.display='none'">&times;</span>
+            <h3 style="margin-top:0; color: var(--primary);">Special Character Palette</h3>
+            <p style="font-size: 13px; color: #555;">Click any textbox (like your X or Y column headers), then click a symbol below to insert it at your cursor.</p>
+            
+<h4 style="margin: 10px 0 5px 0;">Greek Letters (Lowercase)</h4>
+            <div class="math-keys">
+                <button onclick="insertSymbol('α')">α</button>
+                <button onclick="insertSymbol('β')">β</button>
+                <button onclick="insertSymbol('γ')">γ</button>
+                <button onclick="insertSymbol('δ')">δ</button>
+                <button onclick="insertSymbol('ε')">ε</button>
+                <button onclick="insertSymbol('θ')">θ</button>
+                <button onclick="insertSymbol('λ')">λ</button>
+                <button onclick="insertSymbol('μ')">μ</button>
+                <button onclick="insertSymbol('π')">π</button>
+                <button onclick="insertSymbol('ρ')">ρ</button>
+                <button onclick="insertSymbol('σ')">σ</button>
+                <button onclick="insertSymbol('τ')">τ</button>
+                <button onclick="insertSymbol('φ')">φ</button>
+                <button onclick="insertSymbol('ω')">ω</button>
+            </div>
+
+            <h4 style="margin: 10px 0 5px 0;">Greek Letters (Uppercase)</h4>
+            <div class="math-keys">
+                <button onclick="insertSymbol('Γ')">Γ</button>
+                <button onclick="insertSymbol('Δ')">Δ</button>
+                <button onclick="insertSymbol('Θ')">Θ</button>
+                <button onclick="insertSymbol('Λ')">Λ</button>
+                <button onclick="insertSymbol('Ξ')">Ξ</button>
+                <button onclick="insertSymbol('Π')">Π</button>
+                <button onclick="insertSymbol('Σ')">Σ</button>
+                <button onclick="insertSymbol('Φ')">Φ</button>
+                <button onclick="insertSymbol('Ψ')">Ψ</button>
+                <button onclick="insertSymbol('Ω')">Ω</button>
+            </div>
+
+            <h4 style="margin: 10px 0 5px 0;">Math & Units</h4>
+            <div class="math-keys">
+                <button onclick="insertSymbol('°')">°</button>
+                <button onclick="insertSymbol('±')">±</button>
+                <button onclick="insertSymbol('≤')">≤</button>
+                <button onclick="insertSymbol('≥')">≥</button>
+                <button onclick="insertSymbol('≠')">≠</button>
+                <button onclick="insertSymbol('×')">×</button>
+                <button onclick="insertSymbol('÷')">÷</button>
+                <button onclick="insertSymbol('√')">√</button>
+                <button onclick="insertSymbol('∞')">∞</button>
+                <button onclick="insertSymbol('Å')">Å</button>
+            </div>
+
+            <h4 style="margin: 10px 0 5px 0;">Superscripts</h4>
+            <div class="math-keys">
+                <button onclick="insertSymbol('⁰')">⁰</button>
+                <button onclick="insertSymbol('¹')">¹</button>
+                <button onclick="insertSymbol('²')">²</button>
+                <button onclick="insertSymbol('³')">³</button>
+                <button onclick="insertSymbol('⁴')">⁴</button>
+                <button onclick="insertSymbol('⁵')">⁵</button>
+                <button onclick="insertSymbol('⁶')">⁶</button>
+                <button onclick="insertSymbol('⁺')">⁺</button>
+                <button onclick="insertSymbol('⁻')">⁻</button>
+                <button onclick="insertSymbol('ⁿ')">ⁿ</button>
+            </div>
+
+            <h4 style="margin: 10px 0 5px 0;">Subscripts</h4>
+            <div class="math-keys">
+                <button onclick="insertSymbol('₀')">₀</button>
+                <button onclick="insertSymbol('₁')">₁</button>
+                <button onclick="insertSymbol('₂')">₂</button>
+                <button onclick="insertSymbol('₃')">₃</button>
+                <button onclick="insertSymbol('₄')">₄</button>
+                <button onclick="insertSymbol('₅')">₅</button>
+                <button onclick="insertSymbol('₆')">₆</button>
+                <button onclick="insertSymbol('₊')">₊</button>
+                <button onclick="insertSymbol('₋')">₋</button>
+            </div>
+            
+            <div style="text-align: right; margin-top: 15px;">
+                <button onclick="document.getElementById('symbolModal').style.display='none'">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Info Modal 1: Input Format -->
+    <div id="infoModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="document.getElementById('infoModal').style.display='none'">&times;</span>
+            <h3 style="margin-top:0; color: var(--primary);">Input File Format Info</h3>
+            <p>To upload data smoothly, ensure your CSV file follows these rules:</p>
+            <ul>
+                <li><strong>Column 1:</strong> X values (independent variable)</li>
+                <li><strong>Column 2:</strong> Y values (dependent variable)</li>
+                <li><strong>Headers (Optional):</strong> If the first row contains text, the app will automatically detect it and set them as your axis titles.</li>
+                <li><strong>Scientific Notation:</strong> Supported automatically (e.g., <code>1.5e-3</code>).</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Info Modal 2: Statistics Background -->
+    <div id="statsModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="document.getElementById('statsModal').style.display='none'">&times;</span>
+            <h3 style="margin-top:0; color: var(--primary);">Regression Analysis Background</h3>
+            <p><strong>Regression Analysis</strong> is a statistical process used to estimate the relationships between a dependent variable (Y) and an independent variable (X). The goal is to find the mathematical model that best "fits" the observed data.</p>
+            <ul>
+                <li><strong>R<sup>2</sup> (Coefficient of Determination):</strong> A measure from 0 to 1 indicating how well the model explains the variability of the data. An R<sup>2</sup> closer to 1 implies a tighter fit.</li>
+                <li><strong>Sum of Residuals Squared (SSR):</strong> The sum of the squares of the vertical distances (residuals) between each raw data point and the fitted curve.</li>
+                <li><strong>Standard Error of the Estimate (S<sub>e</sub>):</strong> Represents the average distance that the observed values fall from the regression line.</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Custom Function Builder Modal -->
+    <div id="customFitModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="document.getElementById('customFitModal').style.display='none'">&times;</span>
+            <h3 style="margin-top:0; color: var(--primary);">Build Custom Mathematical Model</h3>
+            <p style="font-size: 14px; color: #555;">Construct a function using mathematical operators. Define unknown parameters using letters (e.g., <strong>a, b, c</strong>). Adjust the parameters below to manually minimize the residuals.</p>
+            
+            <div class="eq-builder">
+                <div class="math-keys" id="mathKeys">
+                    <button onclick="insertEq(' + ')">+</button>
+                    <button onclick="insertEq(' - ')">-</button>
+                    <button onclick="insertEq(' * ')">&times;</button>
+                    <button onclick="insertEq(' / ')">&divide;</button>
+                    <button onclick="insertEq(' ^ ')">^</button>
+                    <button onclick="insertEq(' ( ')">(</button>
+                    <button onclick="insertEq(' ) ')">)</button>
+                    <button onclick="insertEq('sin(')">sin()</button>
+                    <button onclick="insertEq('cos(')">cos()</button>
+                    <button onclick="insertEq('exp(')">exp()</button>
+                    <button onclick="insertEq('log(')">ln()</button>
+                    <button onclick="insertEq('sqrt(')">sqrt()</button>
+                    <button class="var-key" onclick="insertEq('x')">x (Data)</button>
+                    <button class="var-key" onclick="insertEq('a')">a</button>
+                    <button class="var-key" onclick="insertEq('b')">b</button>
+                    <button class="var-key" onclick="insertEq('c')">c</button>
+                </div>
+                
+                <div class="eq-input-group">
+                    <span>y = </span>
+                    <input type="text" id="customEqInput" value="a * x^2 + b * x" placeholder="e.g. a * exp(-b * x)">
+                    <button onclick="parseCustomEquation()" style="background-color: var(--accent);">Initialize Variables</button>
+                </div>
+
+                <div id="paramSlidersContainer" class="param-sliders" style="display: none;">
+                    <h4 style="margin-top: 0;">Adjust Parameters</h4>
+                    <div id="sliderList"></div>
+                    <div style="text-align: right; margin-top: 10px;">
+                        <button onclick="document.getElementById('customFitModal').style.display='none'">Close & View Graph</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentFitResult = null;
+        let currentData = [];
+        let customCompiledEquation = null;
+        let customParameters = {}; 
+
+        // Track last focused input for the Symbol Palette
+        let lastFocusedInput = null;
+        document.addEventListener('focusin', function(e) {
+            if (e.target.tagName === 'INPUT' && e.target.type === 'text') {
+                lastFocusedInput = e.target;
+            }
+        });
+
+        // Insert Symbol into whichever input was last active
+        function insertSymbol(symbol) {
+            if (!lastFocusedInput) {
+                alert("Please click inside a textbox (like 'X Data' or 'Y Data') first, then select a symbol.");
+                return;
+            }
+            const start = lastFocusedInput.selectionStart;
+            const end = lastFocusedInput.selectionEnd;
+            const text = lastFocusedInput.value;
+            lastFocusedInput.value = text.substring(0, start) + symbol + text.substring(end);
+            lastFocusedInput.focus();
+            // Move cursor to right after the inserted symbol
+            lastFocusedInput.selectionStart = lastFocusedInput.selectionEnd = start + symbol.length;
+        }
+
+        document.getElementById('fitType').addEventListener('change', function() {
+            const type = this.value;
+            const forceOriginContainer = document.getElementById('forceOriginContainer');
+            const forceOriginCheck = document.getElementById('forceOrigin');
+            
+            if (type === 'custom') {
+                document.getElementById('customFitModal').style.display = 'block';
+            }
+            
+            if (['linear', 'polynomial-2', 'polynomial-3', 'polynomial-4'].includes(type)) {
+                forceOriginCheck.disabled = false;
+                forceOriginContainer.classList.remove('disabled');
+            } else {
+                forceOriginCheck.disabled = true;
+                forceOriginCheck.checked = false;
+                forceOriginContainer.classList.add('disabled');
+            }
+        });
+
+        function insertEq(text) {
+            const input = document.getElementById('customEqInput');
+            const start = input.selectionStart;
+            const end = input.selectionEnd;
+            input.value = input.value.substring(0, start) + text + input.value.substring(end);
+            input.focus();
+            input.selectionStart = input.selectionEnd = start + text.length;
+        }
+
+        function parseCustomEquation() {
+            const eqStr = document.getElementById('customEqInput').value;
+            try {
+                const node = math.parse(eqStr);
+                customCompiledEquation = node.compile();
+                
+                let symbols = new Set();
+                node.traverse(function (n) {
+                    if (n.isSymbolNode && n.name !== 'x' && typeof math[n.name] !== 'function') {
+                        symbols.add(n.name);
+                    }
+                });
+
+                const sliderList = document.getElementById('sliderList');
+                sliderList.innerHTML = '';
+                customParameters = {};
+
+                if (symbols.size === 0) {
+                    sliderList.innerHTML = '<p>No variables (like a, b, c) detected. Add some to adjust!</p>';
+                } else {
+                    symbols.forEach(sym => {
+                        customParameters[sym] = 1.0; 
+                        const row = document.createElement('div');
+                        row.className = 'param-slider-row';
+                        row.innerHTML = `
+                            <strong>${sym} =</strong> 
+                            <input type="number" id="num_${sym}" value="1.0" step="any" oninput="syncParam('${sym}', this.value)">
+                            <button onclick="stepParam('${sym}', -0.1)" class="btn-info">-</button>
+                            <button onclick="stepParam('${sym}', 0.1)" class="btn-info">+</button>
+                        `;
+                        sliderList.appendChild(row);
+                    });
+                }
+                
+                document.getElementById('paramSlidersContainer').style.display = 'block';
+                runCustomFit(); 
+            } catch (error) {
+                alert("Invalid mathematical expression. Please check your equation syntax.\n\nError: " + error.message);
+            }
+        }
+
+        function syncParam(sym, val) {
+            customParameters[sym] = parseFloat(val) || 0;
+            runCustomFit();
+        }
+
+        function stepParam(sym, stepSize) {
+            const input = document.getElementById(`num_${sym}`);
+            let val = parseFloat(input.value) || 0;
+            val += stepSize;
+            input.value = val.toPrecision(4);
+            syncParam(sym, val);
+        }
+
+        function invertMatrix(m) {
+            let n = m.length;
+            let a = m.map(row => [...row]);
+            let i = Array.from({length: n}, (_, r) => Array.from({length: n}, (_, c) => r === c ? 1 : 0));
+            for(let k=0; k<n; k++) {
+                let temp = a[k][k];
+                if(Math.abs(temp) < 1e-10) return null; 
+                for(let j=0; j<n; j++) { a[k][j] /= temp; i[k][j] /= temp; }
+                for(let r=0; r<n; r++) {
+                    if(r === k) continue;
+                    let factor = a[r][k];
+                    for(let j=0; j<n; j++) { a[r][j] -= factor*a[k][j]; i[r][j] -= factor*i[k][j]; }
+                }
+            }
+            return i;
+        }
+
+        function customPolyOriginFit(data, degree) {
+            let X = [];
+            let Y = [];
+            for (let i = 0; i < data.length; i++) {
+                let row = [];
+                for (let j = degree; j >= 1; j--) { row.push(Math.pow(data[i][0], j)); }
+                X.push(row);
+                Y.push([data[i][1]]);
+            }
+
+            let XT = X[0].map((_, colIndex) => X.map(row => row[colIndex]));
+            let XTX = XT.map(row => XT[0].map((_, j) => row.reduce((sum, val, k) => sum + val * X[k][j], 0)));
+            let XTX_inv = invertMatrix(XTX);
+            
+            if (!XTX_inv) { alert("Matrix inversion failed. Check data format."); return null; }
+
+            let XTX_inv_XT = XTX_inv.map(row => XT[0].map((_, j) => row.reduce((sum, val, k) => sum + val * XT[k][j], 0)));
+            let beta = XTX_inv_XT.map(row => row.reduce((sum, val, k) => sum + val * Y[k][0], 0));
+
+            let equation = [...beta, 0]; 
+            
+            let strParts = [];
+            for (let i = 0; i < degree; i++) {
+                let p = degree - i;
+                let c = equation[i];
+                if (c === 0) continue;
+                let cStr = Number(c.toPrecision(6));
+                if (p === 1) strParts.push(`${cStr}x`);
+                else strParts.push(`${cStr}x^${p}`);
+            }
+            let eqString = strParts.length > 0 ? strParts.join(' + ') : '0';
+            eqString = eqString.replace(/\+ -/g, '- ');
+
+            let points = [];
+            let ssr = 0, sst = 0, meanY = 0;
+            data.forEach(pt => meanY += pt[1]);
+            meanY /= data.length;
+
+            data.forEach(pt => {
+                let x = pt[0], actualY = pt[1];
+                let predY = 0;
+                for (let i = 0; i <= degree; i++) { predY += equation[i] * Math.pow(x, degree - i); }
+                points.push([x, predY]);
+                ssr += Math.pow(actualY - predY, 2);
+                sst += Math.pow(actualY - meanY, 2);
+            });
+
+            let r2 = sst === 0 ? 0 : 1 - (ssr / sst);
+
+            return { equation: equation, points: points, string: eqString, r2: r2.toFixed(4) };
+        }
+
+        function getParameterStdevs(data, fitType, result, isForcedOrigin) {
+            let n = data.length;
+            let p = result.equation.length;
+            if (isForcedOrigin && (fitType === 'linear' || fitType.startsWith('polynomial'))) {
+                p = result.equation.length - 1; 
+            }
+            
+            let X = [];
+            let transformedSSR = 0;
+
+            data.forEach(pt => {
+                let x = pt[0], y = pt[1], row = [];
+                if(fitType === 'linear') { 
+                    row = isForcedOrigin ? [x] : [x, 1]; 
+                    let predY = isForcedOrigin ? result.equation[0]*x : result.equation[0]*x + result.equation[1];
+                    transformedSSR += Math.pow(y - predY, 2);
+                }
+                else if(fitType === 'exponential') { row = [1, x]; transformedSSR += Math.pow(Math.log(y) - (Math.log(result.equation[0]) + result.equation[1]*x), 2); }
+                else if(fitType === 'logarithmic') { row = [1, Math.log(x)]; transformedSSR += Math.pow(y - (result.equation[0] + result.equation[1]*Math.log(x)), 2); }
+                else if(fitType === 'power') { row = [1, Math.log(x)]; transformedSSR += Math.pow(Math.log(y) - (Math.log(result.equation[0]) + result.equation[1]*Math.log(x)), 2); }
+                else if(fitType.startsWith('polynomial')) {
+                    let deg = parseInt(fitType.split('-')[1]);
+                    for(let i=deg; i>0; i--) row.push(Math.pow(x, i));
+                    if (!isForcedOrigin) row.push(1);
+                    
+                    let predY = 0;
+                    for(let i=0; i<=deg; i++) predY += result.equation[i] * Math.pow(x, deg-i);
+                    transformedSSR += Math.pow(y - predY, 2);
+                }
+                X.push(row);
+            });
+
+            let XT = X[0].map((_, colIndex) => X.map(row => row[colIndex]));
+            let XTX = XT.map(row => XT[0].map((_, j) => row.reduce((sum, val, k) => sum + val * X[k][j], 0)));
+            let XTX_inv = invertMatrix(XTX);
+            
+            if(!XTX_inv) return Array(result.equation.length).fill('Singular');
+
+            let MSE = transformedSSR / Math.max(1, (n - p));
+            let stdevs = [];
+            
+            for(let i=0; i<p; i++){
+                let variance = MSE * XTX_inv[i][i];
+                stdevs.push(variance >= 0 ? Math.sqrt(variance) : 0);
+            }
+
+            if (isForcedOrigin && (fitType === 'linear' || fitType.startsWith('polynomial'))) {
+                stdevs.push("Fixed at 0"); 
+            }
+
+            if(fitType === 'exponential' || fitType === 'power') { stdevs[0] = result.equation[0] * stdevs[0]; }
+            return stdevs;
+        }
+
+        function addRow() {
+            const tbody = document.getElementById('tableBody');
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td><input type="text"></td><td><input type="text"></td>`;
+            tbody.appendChild(tr);
+        }
+
+        function clearData() {
+            document.getElementById('tableBody').innerHTML = '';
+            for(let i=0; i<5; i++) addRow();
+        }
+
+        document.getElementById('csvFileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            Papa.parse(file, {
+                complete: function(results) {
+                    let dataRows = results.data;
+                    if (dataRows.length > 0 && isNaN(parseFloat(dataRows[0][0])) && isNaN(parseFloat(dataRows[0][1]))) {
+                        document.getElementById('xTitle').value = dataRows[0][0] || 'X Data';
+                        document.getElementById('yTitle').value = dataRows[0][1] || 'Y Data';
+                        dataRows = dataRows.slice(1);
+                    }
+                    const tbody = document.getElementById('tableBody');
+                    tbody.innerHTML = '';
+                    dataRows.forEach(row => {
+                        if (row.length >= 2 && !isNaN(parseFloat(row[0])) && !isNaN(parseFloat(row[1]))) {
+                            const tr = document.createElement('tr');
+                            tr.innerHTML = `<td><input type="text" value="${row[0]}"></td><td><input type="text" value="${row[1]}"></td>`;
+                            tbody.appendChild(tr);
+                        }
+                    });
+                }
+            });
+        });
+
+        function getTableData() {
+            const rows = document.querySelectorAll('#tableBody tr');
+            const data = [];
+            rows.forEach(row => {
+                const inputs = row.querySelectorAll('input');
+                const x = parseFloat(inputs[0].value);
+                const y = parseFloat(inputs[1].value);
+                if (!isNaN(x) && !isNaN(y)) data.push([x, y]);
+            });
+            return data.sort((a, b) => a[0] - b[0]);
+        }
+
+        function performFit() {
+            const fitType = document.getElementById('fitType').value;
+            const isForcedOrigin = document.getElementById('forceOrigin').checked && !document.getElementById('forceOrigin').disabled;
+            
+            if (fitType === 'custom') {
+                document.getElementById('customFitModal').style.display = 'block';
+                return;
+            }
+
+            const data = getTableData();
+            if (data.length < 2) { alert("Please enter at least 2 valid data points."); return; }
+
+            let result;
+            let options = { precision: 6 };
+
+            if (fitType.startsWith('polynomial')) {
+                const degree = parseInt(fitType.split('-')[1]);
+                if (isForcedOrigin) { result = customPolyOriginFit(data, degree); } 
+                else { result = regression.polynomial(data, { order: degree, precision: 6 }); }
+            } else if (fitType === 'linear') {
+                if (isForcedOrigin) { result = customPolyOriginFit(data, 1); } 
+                else { result = regression.linear(data, options); }
+            } else {
+                result = regression[fitType](data, options);
+            }
+
+            if (!result) return;
+            
+            // FIX 1: Ensure result.string NEVER has 'y =' at the front (regression.js does this automatically)
+            result.string = result.string.replace(/^y\s*=\s*/i, '');
+
+            currentData = data;
+            currentFitResult = result;
+            currentFitResult.type = fitType;
+
+            let ssr = 0;
+            let resX = [], resY = [], predictedY = [], rawX = [], rawY = [];
+
+            data.forEach((point, index) => {
+                const x = point[0], actualY = point[1], predY = result.points[index][1];
+                rawX.push(x); rawY.push(actualY); predictedY.push(predY);
+                ssr += Math.pow(actualY - predY, 2);
+                resX.push(x, x, null); resY.push(actualY, predY, null);
+            });
+
+            let p = isForcedOrigin ? result.equation.length - 1 : result.equation.length;
+            let standardError = Math.sqrt(ssr / Math.max(1, (data.length - p)));
+            let paramStdevs = getParameterStdevs(data, fitType, result, isForcedOrigin);
+
+            updateStats(result, ssr, standardError, fitType, paramStdevs, isForcedOrigin);
+            drawPlot(rawX, rawY, predictedY, resX, resY, result.string, result.r2, fitType);
+        }
+
+        function runCustomFit() {
+            if (!customCompiledEquation) return;
+            const data = getTableData();
+            if (data.length < 2) return;
+
+            let ssr = 0, sst = 0, meanY = 0;
+            let resX = [], resY = [], predictedY = [], rawX = [], rawY = [];
+            
+            data.forEach(pt => meanY += pt[1]);
+            meanY /= data.length;
+
+            data.forEach(pt => {
+                const x = pt[0], actualY = pt[1];
+                let scope = Object.assign({ x: x }, customParameters);
+                let predY = 0;
+                
+                try { predY = customCompiledEquation.evaluate(scope); } catch(e) { predY = NaN; }
+
+                rawX.push(x); rawY.push(actualY); predictedY.push(predY);
+                
+                if(!isNaN(predY)){
+                    ssr += Math.pow(actualY - predY, 2);
+                    sst += Math.pow(actualY - meanY, 2);
+                    resX.push(x, x, null); resY.push(actualY, predY, null);
+                }
+            });
+
+            const r2 = sst === 0 ? 0 : (1 - (ssr / sst));
+            const p = Object.keys(customParameters).length;
+            const standardError = Math.sqrt(ssr / Math.max(1, (data.length - p)));
+
+            currentData = data;
+            // Get clean custom string (no leading 'y =')
+            let eqString = document.getElementById('customEqInput').value.replace(/^y\s*=\s*/i, '');
+            currentFitResult = { type: 'custom', string: eqString, r2: r2.toFixed(4), points: predictedY.map((y, i) => [rawX[i], y]) };
+
+            const statsArea = document.getElementById('statsArea');
+            let paramHTML = `<strong>Manual Parameters:</strong><br><div style="margin-top:8px;">`;
+            for (const [key, value] of Object.entries(customParameters)) {
+                paramHTML += `<div class="param-row"><span>${key}: ${value}</span> <span>&plusmn; N/A (Manual Fit)</span></div>`;
+            }
+            paramHTML += `</div>`;
+
+            statsArea.innerHTML = `
+                <div class="stat-box full-width"><strong>Model:</strong> Custom Interactive Model</div>
+                <div class="stat-box full-width"><strong>Equation:</strong> y = ${eqString}</div>
+                <div class="stat-box">${paramHTML}</div>
+                <div class="stat-box">
+                    <strong>R<sup>2</sup>:</strong> ${r2.toFixed(4)}<br><br>
+                    <strong>Sum of Res. Sq. (SSR):</strong> ${ssr.toPrecision(5)}<br><br>
+                    <strong>Std. Error of Estimate (S<sub>e</sub>):</strong> ${standardError.toPrecision(5)}
+                </div>
+            `;
+            drawPlot(rawX, rawY, predictedY, resX, resY, eqString, r2.toFixed(4), 'Custom');
+        }
+
+        function updateStats(result, ssr, standardError, fitType, paramStdevs, isForcedOrigin) {
+            const statsArea = document.getElementById('statsArea');
+            let paramSymbols = [];
+            
+            if(fitType === 'linear') paramSymbols = ['m (slope)', 'b (intercept)'];
+            else if(fitType === 'exponential' || fitType === 'logarithmic' || fitType === 'power') paramSymbols = ['A', 'B'];
+            else if(fitType.startsWith('polynomial')) {
+                let deg = parseInt(fitType.split('-')[1]);
+                for(let i=deg; i>=0; i--) paramSymbols.push(`C<sub>${i}</sub>`);
+            }
+
+            let paramHTML = `<strong>Parameters & Std. Dev:</strong><br><div style="margin-top:8px;">`;
+            result.equation.forEach((coef, i) => {
+                let sdStr = typeof paramStdevs[i] === 'number' ? paramStdevs[i].toPrecision(4) : paramStdevs[i];
+                paramHTML += `<div class="param-row"><span>${paramSymbols[i]}: ${coef.toPrecision(5)}</span> <span>&plusmn; ${sdStr}</span></div>`;
+            });
+            paramHTML += `</div>`;
+
+            const modelName = document.getElementById('fitType').options[document.getElementById('fitType').selectedIndex].text;
+            let displayModel = isForcedOrigin ? `${modelName} (Forced Through Origin)` : modelName;
+
+            statsArea.innerHTML = `
+                <div class="stat-box full-width"><strong>Model:</strong> ${displayModel}</div>
+                <div class="stat-box full-width"><strong>Equation:</strong> y = ${result.string}</div>
+                <div class="stat-box">${paramHTML}</div>
+                <div class="stat-box">
+                    <strong>R<sup>2</sup>:</strong> ${result.r2}<br><br>
+                    <strong>Sum of Res. Sq. (SSR):</strong> ${ssr.toPrecision(5)}<br><br>
+                    <strong>Std. Error of Estimate (S<sub>e</sub>):</strong> ${standardError.toPrecision(5)}
+                </div>
+            `;
+        }
+
+        function drawPlot(rawX, rawY, predY, resX, resY, eqStr, r2Str, modelName) {
+            const xLabel = document.getElementById('xTitle').value || 'X Axis';
+            const yLabel = document.getElementById('yTitle').value || 'Y Axis';
+            let titlePrefix = modelName.charAt(0).toUpperCase() + modelName.slice(1);
+
+            let sortedIndices = Array.from(rawX.keys()).sort((a,b) => rawX[a] - rawX[b]);
+            let sortedRawX = sortedIndices.map(i => rawX[i]);
+            let sortedPredY = sortedIndices.map(i => predY[i]);
+
+            const traceData = { x: rawX, y: rawY, mode: 'markers', type: 'scatter', name: 'Raw Data', marker: { size: 10, color: 'blue', symbol: 'circle-open', line: {width: 2} } };
+            const traceFit = { x: sortedRawX, y: sortedPredY, mode: 'lines', type: 'scatter', name: 'Fitted Curve', line: { color: 'black', width: 2 } };
+            const traceRes = { x: resX, y: resY, mode: 'lines', type: 'scatter', name: 'Residuals', line: { color: 'red', width: 1, dash: 'dot' }, hoverinfo: 'skip' };
+
+            const layout = {
+                title: `${yLabel} vs. ${xLabel}`,
+                xaxis: { title: xLabel },
+                yaxis: { title: yLabel },
+                margin: { l: 60, r: 220, t: 50, b: 50 },
+                hovermode: 'closest',
+                
+                legend: {
+                    x: 1.04,
+                    y: 1,
+                    xanchor: 'left',
+                    yanchor: 'top'
+                },
+                
+                annotations: [{
+                    xref: 'paper', yref: 'paper',
+                    x: 1.04, 
+                    y: 0, 
+                    xanchor: 'left', 
+                    yanchor: 'bottom', 
+                    text: `<b>${titlePrefix} Fit:</b><br>y = ${eqStr}<br>R<sup>2</sup> = ${r2Str}`,
+                    font: { size: 12, color: '#333' },
+                    align: 'left',
+                    showarrow: false,
+                    bgcolor: 'rgba(248, 249, 250, 0.95)',
+                    bordercolor: '#ccc',
+                    borderpad: 8
+                }]
+            };
+
+            Plotly.newPlot('plotArea', [traceRes, traceData, traceFit], layout, {responsive: true});
+        }
+
+        function saveImage() {
+            const plot = document.getElementById('plotArea');
+            if (plot.data) { Plotly.downloadImage(plot, {format: 'png', width: 850, height: 600, filename: 'GrubbFit_Graph'}); } 
+            else { alert("Please calculate a fit first."); }
+        }
+
+        function downloadCSV() {
+            if (!currentFitResult) { alert("Please calculate a fit first."); return; }
+            let csvContent = "data:text/csv;charset=utf-8,";
+            let isForced = document.getElementById('forceOrigin').checked && !document.getElementById('forceOrigin').disabled;
+            let fullType = isForced ? currentFitResult.type + " (Forced through Origin)" : currentFitResult.type;
+            
+            csvContent += "Model Type," + fullType + "\n";
+            csvContent += "Equation," + currentFitResult.string.replace(/,/g, '') + "\n";
+            csvContent += "R-squared," + currentFitResult.r2 + "\n\n";
+            
+            const xTitle = document.getElementById('xTitle').value;
+            const yTitle = document.getElementById('yTitle').value;
+            csvContent += `${xTitle} (X),${yTitle} (Raw Y),Predicted Y,Residual\n`;
+            
+            currentData.forEach((point, index) => {
+                const x = point[0], y = point[1];
+                const predY = currentFitResult.points[index][1];
+                csvContent += `${x},${y},${predY},${y - predY}\n`;
+            });
+
+            const link = document.createElement("a");
+            link.setAttribute("href", encodeURI(csvContent));
+            link.setAttribute("download", "GrubbFit_Results.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        window.onload = function() {
+            Plotly.newPlot('plotArea', [], {title: 'Enter data and calculate fit to view graph.'});
+        };
+    </script>
+</body>
+</html>
