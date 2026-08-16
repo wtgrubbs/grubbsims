@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ModZero - Prime Dominance</title>
+    <style>
+        :root {
+            --bg-color: #0b0c10;
+            --panel-bg: #1f2833;
+            --text-color: #c5c6c7;
+            --accent-1: #66fcf1;
+            --accent-2: #45a29e;
+            --neon-pink: #ff007f;
+            --neon-green: #39ff14;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Control Panel */
+        #sidebar {
+            width: 350px;
+            background-color: var(--panel-bg);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.8);
+            z-index: 10;
+            overflow-y: auto;
+        }
+
+        h1 { margin: 0; color: var(--accent-1); text-transform: uppercase; letter-spacing: 2px; font-size: 1.5em; }
+        label { font-weight: bold; font-size: 0.85em; color: var(--accent-2); }
+        
+        select, input[type="range"], input[type="file"], button {
+            width: 100%;
+            padding: 8px;
+            margin-top: 2px;
+            background: #000;
+            color: var(--accent-1);
+            border: 1px solid var(--accent-2);
+            border-radius: 4px;
+            outline: none;
+            box-sizing: border-box;
+        }
+
+        input[type="file"] { padding: 5px; font-size: 0.8em; }
+        
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(0,0,0,0.3);
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid var(--accent-2);
+            cursor: pointer;
+        }
+        
+        .checkbox-container input[type="checkbox"] {
+            width: auto;
+            margin: 0;
+            cursor: pointer;
+        }
+
+        .btn-row { display: flex; gap: 10px; }
+        
+        button {
+            background: var(--accent-2);
+            color: #000;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+            text-transform: uppercase;
+        }
+        button:hover:not(:disabled) { background: var(--accent-1); }
+        button:disabled { opacity: 0.4; cursor: not-allowed; }
+        
+        .btn-alt { background: transparent; color: var(--accent-1); border: 1px solid var(--accent-1); }
+        .btn-alt:hover:not(:disabled) { background: rgba(102, 252, 241, 0.2); }
+        .btn-danger { background: var(--neon-pink); border-color: var(--neon-pink); color: #fff;}
+        .btn-danger:hover:not(:disabled) { background: #d4006a; }
+        .btn-success { background: var(--neon-green); border-color: var(--neon-green); color: #000;}
+        .btn-success:hover:not(:disabled) { background: #2cd40f; }
+
+        /* Game Board Area */
+        #game-container {
+            flex-grow: 1;
+            position: relative;
+            background: radial-gradient(circle, #1a1a1d 0%, #000000 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        canvas { display: block; }
+
+        /* Modals */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background: var(--panel-bg);
+            padding: 30px;
+            border: 2px solid var(--accent-1);
+            border-radius: 8px;
+            max-width: 600px;
+            width: 80%;
+            box-shadow: 0 0 20px rgba(102, 252, 241, 0.3);
+            line-height: 1.6;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-content h2 { color: var(--accent-1); margin-top: 0; }
+        .close-btn { background: var(--neon-pink); color: #fff; border: none; margin-top: 20px; }
+        .close-btn:hover { background: #d4006a; }
+
+        /* Live Graph Stats */
+        #stats-graph {
+            background: #0b0c10;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid var(--accent-2);
+            margin-top: 5px;
+        }
+        .bar-row { display: flex; align-items: center; gap: 8px; font-size: 0.7em; margin-bottom: 6px; }
+        .bar-label { width: 105px; text-align: right; color: #fff; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .bar-container { position: relative; flex-grow: 1; background: #222; height: 16px; border-radius: 3px; overflow: hidden; }
+        .bar-init { position: absolute; height: 100%; top: 0; left: 0; z-index: 1; opacity: 0.35; border-right: 1px solid rgba(255,255,255,0.8); }
+        .bar-act { position: absolute; height: 100%; top: 0; left: 0; z-index: 2; transition: width 0.3s ease; }
+        .bar-val { width: 35px; text-align: left; color: #fff; font-weight: bold; }
+        
+        .bg-p { background: var(--neon-green); }
+        .bg-o { background: var(--neon-pink); }
+    </style>
+</head>
+<body>
+
+    <!-- Sidebar Controls -->
+    <div id="sidebar">
+        <h1>ModZero</h1>
+        
+        <div>
+            <label for="loadPlayerCsvBtn">Player 1 Species (CSV):</label>
+            <input type="file" id="loadPlayerCsvBtn" accept=".csv">
+            <div id="loadedPlayerWormInfo" style="font-size: 0.75em; color: var(--neon-green); margin-top: 4px;"></div>
+        </div>
+
+        <label class="checkbox-container">
+            <input type="checkbox" id="dualPlayerToggle">
+            Enable 2-Player Mode
+        </label>
+
+        <div id="opponentCsvContainer" style="display: none;">
+            <label for="loadOpponentCsvBtn">Opponent Species (CSV):</label>
+            <input type="file" id="loadOpponentCsvBtn" accept=".csv">
+            <div id="loadedOpponentWormInfo" style="font-size: 0.75em; color: var(--neon-pink); margin-top: 4px;"></div>
+        </div>
+
+        <div>
+            <label id="playerHeadLabel" for="playerHead">Create Worm (Head Prime):</label>
+            <select id="playerHead">
+                <option value="7">7 (Length: 11, Slower but Compact)</option>
+                <option value="11">11 (Length: 15, Balanced Speed)</option>
+                <option value="13">13 (Length: 19, Fast Brawler)</option>
+                <option value="17">17 (Length: 29, High-Speed Apex)</option>
+            </select>
+        </div>
+
+        <div>
+            <label for="popSize">Population Size (Per Species):</label>
+            <select id="popSize">
+                <option value="10">10 Worms vs 10 Worms</option>
+                <option value="20" selected>20 Worms vs 20 Worms</option>
+                <option value="40">40 Worms vs 40 Worms</option>
+                <option value="60">60 Worms vs 60 Worms</option>
+            </select>
+        </div>
+        
+        <div>
+            <label for="gridSize">Grid Resolution (Playfield Size):</label>
+            <select id="gridSize">
+                <option value="12">Small (Hex Size 12)</option>
+                <option value="8" selected>Medium (Hex Size 8)</option>
+                <option value="5">Huge (Hex Size 5)</option>
+            </select>
+        </div>
+
+        <div>
+            <label for="speedSlider">Playback Speed Multiplier:</label>
+            <input type="range" id="speedSlider" min="1" max="10" value="5">
+        </div>
+
+        <button id="startBtn">Initialize Simulation</button>
+        
+        <div class="btn-row">
+            <button id="pauseBtn" class="btn-alt" disabled>Pause</button>
+            <button id="endBtn" class="btn-danger" disabled>End Sim</button>
+        </div>
+
+        <button id="saveWormBtn" class="btn-success" disabled>Save Player 1 Species (CSV)</button>
+
+        <div class="btn-row">
+            <button class="btn-alt" onclick="openModal('rulesModal')">Rules</button>
+            <button class="btn-alt" onclick="openModal('strategyModal')">Strategy</button>
+        </div>
+
+        <!-- Live Graph -->
+        <div id="stats-graph">
+            <div style="font-size: 0.8em; margin-bottom: 8px; text-align: center; color: var(--accent-1); font-weight:bold;">LIVE AVERAGES VS. BASELINE</div>
+            
+            <div class="bar-row">
+                <span class="bar-label" id="lbl-p-count">P1 Alive</span>
+                <div class="bar-container">
+                    <div id="init-p-count" class="bar-init bg-p"></div>
+                    <div id="act-p-count" class="bar-act bg-p"></div>
+                </div>
+                <span id="val-p-count" class="bar-val">0</span>
+            </div>
+            <div class="bar-row">
+                <span class="bar-label" id="lbl-o-count">Opp Alive</span>
+                <div class="bar-container">
+                    <div id="init-o-count" class="bar-init bg-o"></div>
+                    <div id="act-o-count" class="bar-act bg-o"></div>
+                </div>
+                <span id="val-o-count" class="bar-val">0</span>
+            </div>
+            
+            <hr style="border-color: #333; margin: 8px 0;">
+            
+            <div class="bar-row">
+                <span class="bar-label" id="lbl-p-len">P1 Len</span>
+                <div class="bar-container">
+                    <div id="init-p-len" class="bar-init bg-p"></div>
+                    <div id="act-p-len" class="bar-act bg-p"></div>
+                </div>
+                <span id="val-p-len" class="bar-val">0</span>
+            </div>
+            <div class="bar-row">
+                <span class="bar-label" id="lbl-o-len">Opp Len</span>
+                <div class="bar-container">
+                    <div id="init-o-len" class="bar-init bg-o"></div>
+                    <div id="act-o-len" class="bar-act bg-o"></div>
+                </div>
+                <span id="val-o-len" class="bar-val">0</span>
+            </div>
+            
+            <hr style="border-color: #333; margin: 8px 0;">
+            
+            <div class="bar-row">
+                <span class="bar-label" id="lbl-p-prime">P1 Primes</span>
+                <div class="bar-container">
+                    <div id="init-p-prime" class="bar-init bg-p"></div>
+                    <div id="act-p-prime" class="bar-act bg-p"></div>
+                </div>
+                <span id="val-p-prime" class="bar-val">0</span>
+            </div>
+            <div class="bar-row">
+                <span class="bar-label" id="lbl-o-prime">Opp Primes</span>
+                <div class="bar-container">
+                    <div id="init-o-prime" class="bar-init bg-o"></div>
+                    <div id="act-o-prime" class="bar-act bg-o"></div>
+                </div>
+                <span id="val-o-prime" class="bar-val">0</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN GAME CONTAINER (RESTORED) -->
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+    </div>
+
+    <!-- Modal: Rules -->
+    <div id="rulesModal" class="modal-overlay">
+        <div class="modal-content">
+            <h2>ModZero: Simulation Rules</h2>
+            <ul>
+                <li><strong>Team Dynamics:</strong> Worms of the same team safely phase through one another and themselves.</li>
+                <li><strong>Prime Armor:</strong> Prime numbers act as absolute armor. If the head of a worm collides with an opponent's prime segment, they simply pass through each other.</li>
+                <li><strong>Prime Harvesting:</strong> Colliding with an opponent's nonprime (composite) segment triggers a harvest from the opponent's tail.</li>
+                <li><strong>Death by Consumption:</strong> If a worm's final prime (its head) is stolen, it dies and is removed.</li>
+                <li><strong>Death by Starvation:</strong> If a worm is reduced to only its head prime (length of 1), it has a 10-cycle window to successfully harvest a prime from an opponent. If it fails, it starves and dies.</li>
+                <li><strong>Total Wipeout:</strong> If a team is reduced to zero living worms, the game immediately ends and the remaining team is victorious.</li>
+            </ul>
+            <button class="close-btn" onclick="closeModal('rulesModal')">Acknowledge</button>
+        </div>
+    </div>
+
+    <!-- Modal: Strategy -->
+    <div id="strategyModal" class="modal-overlay">
+        <div class="modal-content">
+            <h2>Strategy & Advice</h2>
+            <p><strong>The Composite Buffer:</strong> Having long strings of nonprime composite numbers makes a worm physically longer, which increases its speed. However, they are highly vulnerable points of attack.</p>
+            <p><strong>Evolution & Saving:</strong> At the end of a match, you can save your starting species to a CSV file. If your species wins, its "Victory Count" increases, allowing you to track the pedigree of your finest creations over time!</p>
+            <button class="close-btn" onclick="closeModal('strategyModal')">Acknowledge</button>
+        </div>
+    </div>
+
+<script>
+    // --- UI & Canvas Setup ---
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const container = document.getElementById('game-container');
+    
+    function resize() {
+        canvas.width = container.clientWidth;
+        canvas.height = container.clientHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+    // --- Math & Grid Utilities ---
+    const isPrime = num => {
+        if (num < 2) return false;
+        for (let i = 2, s = Math.sqrt(num); i <= s; i++) if (num % i === 0) return false;
+        return true;
+    };
+    const getRandomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+
+    let HEX_SIZE, HEX_WIDTH, HEX_HEIGHT, GRID_COLS, GRID_ROWS;
+    let gridW, gridH, offsetX, offsetY;
+    
+    const hexDirections = [
+        {q: 1, r: 0}, {q: 0, r: 1}, {q: -1, r: 1},
+        {q: -1, r: 0}, {q: 0, r: -1}, {q: 1, r: -1}
+    ];
+
+    function hexToPixel(q, r) {
+        return { x: HEX_SIZE * Math.sqrt(3) * (q + r/2), y: HEX_SIZE * 3/2 * r };
+    }
+
+    function isOutOfBounds(q, r) {
+        let col = q + Math.floor(r/2);
+        let row = r;
+        return col < 0 || col >= GRID_COLS || row < 0 || row >= GRID_ROWS;
+    }
+
+    // --- Core Game Entities & Data ---
+    const HEAD_PRIMES = { 7: 11, 11: 15, 13: 19, 17: 29 };
+    let worms = [];
+    let isRunning = false;
+    let isPaused = false;
+    let animationId;
+    let initialStats = {}; 
+
+    // Global Data for CSV Tracking
+    let activePlayerSpeciesData = null; 
+    let activeOpponentSpeciesData = null;
+
+    let pNameLabel = "Player";
+    let oNameLabel = "Opponent AI";
+
+    function generateSpeciesSequence(headValue) {
+        let length = HEAD_PRIMES[headValue];
+        let seq = [headValue];
+        let usedNums = new Set([headValue]);
+        for(let i = 1; i < length; i++) {
+            let nextVal;
+            do { nextVal = getRandomInt(2, 99); } while(usedNums.has(nextVal));
+            usedNums.add(nextVal);
+            seq.push(nextVal);
+        }
+        return seq;
+    }
+
+    // --- Dual Player Toggle Logic ---
+    document.getElementById('dualPlayerToggle').addEventListener('change', (e) => {
+        const isChecked = e.target.checked;
+        document.getElementById('opponentCsvContainer').style.display = isChecked ? 'block' : 'none';
+        
+        // Reset opponent data if toggled off
+        if (!isChecked) {
+            activeOpponentSpeciesData = null;
+            document.getElementById('loadOpponentCsvBtn').value = "";
+            document.getElementById('loadedOpponentWormInfo').innerText = "";
+        }
+    });
+
+    // --- CSV File Loading Utility ---
+    function parseCsvToSpecies(file, isPlayer) {
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+            const text = evt.target.result;
+            const parts = text.split(',');
+            
+            if (parts.length >= 3) {
+                let sName = parts[0];
+                let sWins = parseInt(parts[1], 10) || 0;
+                let sSeq = parts.slice(2).map(n => parseInt(n, 10)).filter(n => !isNaN(n));
+                
+                if (sSeq.length > 0 && isPrime(sSeq[0])) {
+                    if (isPlayer) {
+                        activePlayerSpeciesData = { name: sName, victories: sWins, sequence: sSeq };
+                        document.getElementById('loadedPlayerWormInfo').innerText = `Loaded: ${sName} | Wins: ${sWins}`;
+                        document.getElementById('playerHead').disabled = true; 
+                        document.getElementById('playerHeadLabel').innerText = "Worm Engine Overridden by P1 CSV";
+                    } else {
+                        activeOpponentSpeciesData = { name: sName, victories: sWins, sequence: sSeq };
+                        document.getElementById('loadedOpponentWormInfo').innerText = `Loaded: ${sName} | Wins: ${sWins}`;
+                    }
+                } else {
+                    alert("Invalid CSV format or missing prime head.");
+                }
+            } else {
+                alert("Invalid CSV format.");
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    document.getElementById('loadPlayerCsvBtn').addEventListener('change', (e) => {
+        if(e.target.files[0]) parseCsvToSpecies(e.target.files[0], true);
+    });
+
+    document.getElementById('loadOpponentCsvBtn').addEventListener('change', (e) => {
+        if(e.target.files[0]) parseCsvToSpecies(e.target.files[0], false);
+    });
+
+    class Worm {
+        constructor(baseSequence, startQ, startR, colorHex, isPlayer, startDir) {
+            this.color = colorHex; 
+            this.isPlayer = isPlayer;
+            this.segments = [];
+            this.headValue = baseSequence[0];
+            this.energy = 0; 
+            this.lastDirIndex = startDir;
+            this.alive = true;
+            this.headOnlyTimer = 0; 
+
+            this.segments.push({q: startQ, r: startR, val: baseSequence[0]});
+            let curQ = startQ;
+            let curR = startR;
+            let tailDir = (startDir + 3) % 6; 
+
+            for(let i = 1; i < baseSequence.length; i++) {
+                curQ += hexDirections[tailDir].q;
+                curR += hexDirections[tailDir].r;
+                this.segments.push({q: curQ, r: curR, val: baseSequence[i]});
+            }
+        }
+
+        get primeCount() { return this.segments.filter(s => isPrime(s.val)).length; }
+        get speed() { return Math.max(1.0, this.segments.length / 10.0); }
+
+        move() {
+            if(!this.alive || this.segments.length === 0) return;
+            
+            let pTurn = 0.2 + (0.8 * (this.primeCount / this.segments.length));
+            let turn = 0;
+            if (Math.random() < pTurn) {
+                turn = Math.random() < 0.5 ? -1 : 1;
+            }
+            
+            let intendedDirIndex = (this.lastDirIndex + turn + 6) % 6;
+            let head = this.segments[0];
+            
+            let validDirFound = false;
+            let bestDirIndex = intendedDirIndex;
+            let nextQ = head.q + hexDirections[bestDirIndex].q;
+            let nextR = head.r + hexDirections[bestDirIndex].r;
+
+            if (isOutOfBounds(nextQ, nextR)) {
+                let fallbackTurns = [0, turn, -turn, 2, -2, 3]; 
+                for(let t of fallbackTurns) {
+                    let testDirIndex = (this.lastDirIndex + t + 6) % 6;
+                    let tQ = head.q + hexDirections[testDirIndex].q;
+                    let tR = head.r + hexDirections[testDirIndex].r;
+                    if (!isOutOfBounds(tQ, tR)) {
+                        bestDirIndex = testDirIndex;
+                        nextQ = tQ;
+                        nextR = tR;
+                        validDirFound = true;
+                        break;
+                    }
+                }
+                if(!validDirFound) return; 
+            }
+
+            this.lastDirIndex = bestDirIndex;
+
+            for (let i = this.segments.length - 1; i > 0; i--) {
+                this.segments[i].q = this.segments[i-1].q;
+                this.segments[i].r = this.segments[i-1].r;
+            }
+            this.segments[0].q = nextQ;
+            this.segments[0].r = nextR;
+
+            if (this.segments.length === 1) {
+                this.headOnlyTimer++;
+                if (this.headOnlyTimer >= 10) {
+                    this.alive = false; 
+                }
+            } else {
+                this.headOnlyTimer = 0; 
+            }
+        }
+
+        draw() {
+            if(!this.alive || this.segments.length === 0) return;
+            
+            for (let i = this.segments.length - 1; i >= 0; i--) {
+                let seg = this.segments[i];
+                let pos = hexToPixel(seg.q, seg.r);
+                
+                let drawX = offsetX + pos.x;
+                let drawY = offsetY + pos.y;
+                let isP = isPrime(seg.val);
+
+                if (i > 0) {
+                    let prevSeg = this.segments[i-1];
+                    let prevPos = hexToPixel(prevSeg.q, prevSeg.r);
+                    ctx.beginPath();
+                    ctx.moveTo(drawX, drawY);
+                    ctx.lineTo(offsetX + prevPos.x, offsetY + prevPos.y);
+                    ctx.strokeStyle = this.color;
+                    ctx.lineWidth = HEX_SIZE * 0.4;
+                    ctx.stroke();
+                }
+
+                ctx.beginPath();
+                ctx.arc(drawX, drawY, isP ? HEX_SIZE * 0.95 : HEX_SIZE * 0.75, 0, Math.PI * 2);
+                ctx.fillStyle = i === 0 ? '#fff' : '#111';
+                ctx.fill();
+                
+                ctx.strokeStyle = i === 0 ? this.color : (isP ? '#fff' : this.color);
+                ctx.lineWidth = isP ? 2.5 : 1;
+                ctx.stroke();
+
+                if (HEX_SIZE >= 8) {
+                    ctx.fillStyle = i === 0 ? '#000' : (isP ? '#fff' : '#ccc');
+                    ctx.font = `${isP ? 'bold' : 'normal'} ${Math.max(9, HEX_SIZE * 0.6)}px Arial`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(seg.val, drawX, drawY);
+                }
+            }
+        }
+    }
+
+    function handleCollisions() {
+        for(let w1 of worms) {
+            if(!w1.alive || w1.segments.length === 0) continue;
+            let head = w1.segments[0];
+            
+            for(let w2 of worms) {
+                if(!w2.alive || w2.segments.length === 0 || w1 === w2 || w1.isPlayer === w2.isPlayer) continue;
+
+                for(let j = 0; j < w2.segments.length; j++) {
+                    let t = w2.segments[j];
+                    if(head.q === t.q && head.r === t.r) {
+                        
+                        if(isPrime(t.val)) { break; }
+
+                        let primesToSteal = 0;
+                        if (t.val % w1.headValue === 0) primesToSteal = 3;
+                        else if (t.val % 2 !== 0) primesToSteal = 2;
+                        else primesToSteal = 1;
+
+                        let pCount = 0;
+                        let stolenPrimeValues = [];
+                        
+                        while (w2.segments.length > 0 && pCount < primesToSteal) {
+                            let tailSeg = w2.segments.pop(); 
+                            if (isPrime(tailSeg.val)) {
+                                stolenPrimeValues.push(tailSeg.val);
+                                pCount++;
+                            }
+                        }
+
+                        if(w2.segments.length === 0) w2.alive = false;
+
+                        let w1Tail = w1.segments[w1.segments.length - 1];
+                        for(let pVal of stolenPrimeValues) {
+                            w1.segments.push({q: w1Tail.q, r: w1Tail.r, val: pVal});
+                        }
+                        break; 
+                    }
+                }
+            }
+        }
+    }
+
+    function updateLabelsAndGraphNames(activeP1Data, activeOppData) {
+        pNameLabel = activeP1Data ? activeP1Data.name : "Player";
+        oNameLabel = activeOppData ? activeOppData.name : "Opponent AI";
+        
+        document.getElementById('lbl-p-count').innerText = pNameLabel + " Alive";
+        document.getElementById('lbl-o-count').innerText = oNameLabel + " Alive";
+        document.getElementById('lbl-p-len').innerText = pNameLabel + " Len";
+        document.getElementById('lbl-o-len').innerText = oNameLabel + " Len";
+        document.getElementById('lbl-p-prime').innerText = pNameLabel + " Primes";
+        document.getElementById('lbl-o-prime').innerText = oNameLabel + " Primes";
+    }
+
+    function updateLiveGraph() {
+        let pWorms = worms.filter(w => w.isPlayer && w.alive);
+        let oWorms = worms.filter(w => !w.isPlayer && w.alive);
+
+        let pCount = pWorms.length;
+        let oCount = oWorms.length;
+
+        let pLenAvg = pWorms.length ? pWorms.reduce((acc, w) => acc + w.segments.length, 0) / pWorms.length : 0;
+        let oLenAvg = oWorms.length ? oWorms.reduce((acc, w) => acc + w.segments.length, 0) / oWorms.length : 0;
+        
+        let pPrimeAvg = pWorms.length ? pWorms.reduce((acc, w) => acc + w.primeCount, 0) / pWorms.length : 0;
+        let oPrimeAvg = oWorms.length ? oWorms.reduce((acc, w) => acc + w.primeCount, 0) / oWorms.length : 0;
+
+        let maxCount = Math.max(10, initialStats.pCount, initialStats.oCount, pCount, oCount);
+        let maxLen = Math.max(30, initialStats.pLen, initialStats.oLen, pLenAvg, oLenAvg);
+        let maxPrime = Math.max(10, initialStats.pPrime, initialStats.oPrime, pPrimeAvg, oPrimeAvg);
+
+        document.getElementById('init-p-count').style.width = `${(initialStats.pCount / maxCount) * 100}%`;
+        document.getElementById('act-p-count').style.width = `${(pCount / maxCount) * 100}%`;
+        document.getElementById('val-p-count').innerText = pCount;
+
+        document.getElementById('init-o-count').style.width = `${(initialStats.oCount / maxCount) * 100}%`;
+        document.getElementById('act-o-count').style.width = `${(oCount / maxCount) * 100}%`;
+        document.getElementById('val-o-count').innerText = oCount;
+
+        document.getElementById('init-p-len').style.width = `${(initialStats.pLen / maxLen) * 100}%`;
+        document.getElementById('act-p-len').style.width = `${(pLenAvg / maxLen) * 100}%`;
+        document.getElementById('val-p-len').innerText = pLenAvg.toFixed(1);
+
+        document.getElementById('init-o-len').style.width = `${(initialStats.oLen / maxLen) * 100}%`;
+        document.getElementById('act-o-len').style.width = `${(oLenAvg / maxLen) * 100}%`;
+        document.getElementById('val-o-len').innerText = oLenAvg.toFixed(1);
+
+        document.getElementById('init-p-prime').style.width = `${(initialStats.pPrime / maxPrime) * 100}%`;
+        document.getElementById('act-p-prime').style.width = `${(pPrimeAvg / maxPrime) * 100}%`;
+        document.getElementById('val-p-prime').innerText = pPrimeAvg.toFixed(1);
+
+        document.getElementById('init-o-prime').style.width = `${(initialStats.oPrime / maxPrime) * 100}%`;
+        document.getElementById('act-o-prime').style.width = `${(oPrimeAvg / maxPrime) * 100}%`;
+        document.getElementById('val-o-prime').innerText = oPrimeAvg.toFixed(1);
+
+        return { pCount, oCount, pPrimeAvg, oPrimeAvg };
+    }
+
+    function calculateInitialStats() {
+        let pWorms = worms.filter(w => w.isPlayer);
+        let oWorms = worms.filter(w => !w.isPlayer);
+
+        initialStats = {
+            pCount: pWorms.length,
+            oCount: oWorms.length,
+            pLen: pWorms.reduce((acc, w) => acc + w.segments.length, 0) / pWorms.length,
+            oLen: oWorms.reduce((acc, w) => acc + w.segments.length, 0) / oWorms.length,
+            pPrime: pWorms.reduce((acc, w) => acc + w.primeCount, 0) / pWorms.length,
+            oPrime: oWorms.reduce((acc, w) => acc + w.primeCount, 0) / oWorms.length
+        };
+    }
+
+    function triggerEndGame(wipeoutWinner = null) {
+        isRunning = false;
+        document.getElementById('pauseBtn').disabled = true;
+        document.getElementById('endBtn').disabled = true;
+        document.getElementById('saveWormBtn').disabled = false; 
+
+        let stats = updateLiveGraph();
+        
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 36px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('SIMULATION TERMINATED', canvas.width/2, canvas.height/2 - 40);
+        
+        let winText = "";
+        let color = "#fff";
+        let playerWon = false;
+        
+        if (wipeoutWinner === 'player' || (wipeoutWinner === null && stats.pPrimeAvg > stats.oPrimeAvg)) {
+            winText = wipeoutWinner === 'player' ? `${pNameLabel.toUpperCase()} WINS BY WIPEOUT!` : `${pNameLabel.toUpperCase()} WINS!`;
+            color = '#39ff14';
+            playerWon = true;
+        } else if (wipeoutWinner === 'opponent' || (wipeoutWinner === null && stats.oPrimeAvg > stats.pPrimeAvg)) {
+            winText = wipeoutWinner === 'opponent' ? `${oNameLabel.toUpperCase()} WINS BY WIPEOUT!` : `${oNameLabel.toUpperCase()} WINS!`;
+            color = '#ff007f';
+        } else {
+            winText = "STALEMATE!";
+        }
+
+        if (playerWon && activePlayerSpeciesData) {
+            activePlayerSpeciesData.victories += 1;
+        }
+
+        ctx.fillStyle = color;
+        ctx.font = 'bold 28px Arial';
+        ctx.fillText(winText, canvas.width/2, canvas.height/2 + 10);
+        
+        ctx.fillStyle = '#ccc';
+        ctx.font = '18px Arial';
+        ctx.fillText(`${pNameLabel} Avg Primes: ${stats.pPrimeAvg.toFixed(2)}  |  ${oNameLabel} Avg Primes: ${stats.oPrimeAvg.toFixed(2)}`, canvas.width/2, canvas.height/2 + 50);
+    }
+
+    function gameLoop() {
+        if(!isRunning) return;
+        
+        if(!isPaused) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.02)';
+            ctx.fillRect(offsetX, offsetY, gridW, gridH);
+            ctx.strokeStyle = 'rgba(102, 252, 241, 0.3)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(offsetX, offsetY, gridW, gridH);
+
+            let speedMult = parseInt(document.getElementById('speedSlider').value) * 0.015;
+
+            for(let w of worms) {
+                if(!w.alive) continue;
+                w.energy += w.speed * speedMult;
+                while(w.energy >= 1.0) {
+                    w.move();
+                    w.energy -= 1.0;
+                }
+                w.draw();
+            }
+
+            handleCollisions();
+            let stats = updateLiveGraph();
+
+            if (stats.pCount === 0) {
+                triggerEndGame('opponent');
+                return;
+            } else if (stats.oCount === 0) {
+                triggerEndGame('player');
+                return;
+            }
+        }
+
+        animationId = requestAnimationFrame(gameLoop);
+    }
+
+    // --- CSV Saving ---
+    document.getElementById('saveWormBtn').addEventListener('click', () => {
+        if (!activePlayerSpeciesData) return;
+
+        let inputName = prompt("Enter an ASCII name for your worm species:", activePlayerSpeciesData.name);
+        if (inputName === null) return; 
+        
+        let cleanName = inputName.replace(/[^\x00-\x7F]/g, "").trim() || "UnknownWorm";
+        activePlayerSpeciesData.name = cleanName;
+
+        let csvContent = `${activePlayerSpeciesData.name},${activePlayerSpeciesData.victories},${activePlayerSpeciesData.sequence.join(',')}`;
+        let blob = new Blob([csvContent], { type: 'text/csv' });
+        let url = URL.createObjectURL(blob);
+        let a = document.createElement('a');
+        a.href = url;
+        a.download = `${cleanName}_Species.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    });
+
+    document.getElementById('startBtn').addEventListener('click', () => {
+        if(animationId) cancelAnimationFrame(animationId);
+        resize();
+        
+        HEX_SIZE = parseInt(document.getElementById('gridSize').value);
+        HEX_WIDTH = Math.sqrt(3) * HEX_SIZE;
+        HEX_HEIGHT = 2 * HEX_SIZE;
+        
+        let maxW = canvas.width - 40;
+        let maxH = canvas.height - 40;
+        
+        GRID_COLS = Math.floor(maxW / HEX_WIDTH);
+        GRID_ROWS = Math.floor(maxH / (HEX_HEIGHT * 0.75));
+        
+        gridW = HEX_WIDTH * GRID_COLS;
+        gridH = HEX_HEIGHT * 0.75 * GRID_ROWS + (HEX_HEIGHT * 0.25);
+        offsetX = (canvas.width - gridW) / 2;
+        offsetY = (canvas.height - gridH) / 2;
+        
+        worms = [];
+        let popSize = parseInt(document.getElementById('popSize').value);
+        
+        let isPlayerCsvUploaded = document.getElementById('loadPlayerCsvBtn').value !== "";
+        let isDualPlayerEnabled = document.getElementById('dualPlayerToggle').checked;
+        
+        // Setup Player Sequence
+        let playerSeq;
+        let currentPlayerData = null;
+
+        if (isPlayerCsvUploaded && activePlayerSpeciesData && activePlayerSpeciesData.sequence.length > 0) {
+            playerSeq = activePlayerSpeciesData.sequence;
+            currentPlayerData = activePlayerSpeciesData;
+        } else {
+            let pHead = parseInt(document.getElementById('playerHead').value);
+            playerSeq = generateSpeciesSequence(pHead);
+            currentPlayerData = { name: "Player", victories: 0, sequence: playerSeq };
+            activePlayerSpeciesData = currentPlayerData; // Store it for saving later
+        }
+
+        // Setup AI/Opponent Sequence
+        let aiSeq;
+        let currentOpponentData = null;
+
+        if (isDualPlayerEnabled && activeOpponentSpeciesData && activeOpponentSpeciesData.sequence.length > 0) {
+            aiSeq = activeOpponentSpeciesData.sequence;
+            currentOpponentData = activeOpponentSpeciesData;
+        } else {
+            const availablePrimes = [7, 11, 13, 17];
+            let aiHead = availablePrimes[Math.floor(Math.random() * availablePrimes.length)];
+            aiSeq = generateSpeciesSequence(aiHead);
+            currentOpponentData = { name: "Opponent AI", victories: 0, sequence: aiSeq };
+        }
+
+        updateLabelsAndGraphNames(currentPlayerData, currentOpponentData);
+
+        for(let i = 0; i < popSize; i++) {
+            let r = Math.floor((GRID_ROWS / popSize) * i) + Math.floor(Math.random() * 2);
+            let q = Math.floor(GRID_COLS * 0.15) - Math.floor(r/2);
+            worms.push(new Worm(playerSeq.slice(), q, r, '#39ff14', true, 0)); 
+        }
+        
+        for(let i = 0; i < popSize; i++) {
+            let r = Math.floor((GRID_ROWS / popSize) * i) + Math.floor(Math.random() * 2);
+            let q = Math.floor(GRID_COLS * 0.85) - Math.floor(r/2);
+            worms.push(new Worm(aiSeq.slice(), q, r, '#ff007f', false, 3)); 
+        }
+
+        calculateInitialStats();
+
+        document.getElementById('pauseBtn').disabled = false;
+        document.getElementById('endBtn').disabled = false;
+        document.getElementById('saveWormBtn').disabled = true; 
+        document.getElementById('pauseBtn').innerText = "Pause";
+        
+        isRunning = true;
+        isPaused = false;
+        gameLoop();
+    });
+
+    document.getElementById('pauseBtn').addEventListener('click', (e) => {
+        isPaused = !isPaused;
+        e.target.innerText = isPaused ? "Continue" : "Pause";
+    });
+
+    document.getElementById('endBtn').addEventListener('click', () => {
+        triggerEndGame();
+    });
+</script>
+</body>
+</html>
