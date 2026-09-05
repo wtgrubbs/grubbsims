@@ -1,0 +1,721 @@
+<!doctype html>
+<html lang="en" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Virtual Titration Lab</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <script src="/_sdk/element_sdk.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+  <style>
+html, body { height: 100%; margin: 0; }
+* { font-family: 'IBM Plex Sans', sans-serif; }
+.mono { font-family: 'JetBrains Mono', monospace; }
+:root {
+  --bg: #0f1729;
+  --surface: #1a2540;
+  --text: #e2e8f0;
+  --primary: #38bdf8;
+  --secondary: #64748b;
+}
+
+.lab-bg { background: var(--bg); color: var(--text); }
+.card { background: var(--surface); border: 1px solid rgba(56,189,248,0.15); border-radius: 12px; }
+
+/* Burette */
+.burette-outer { width: 36px; height: 260px; background: rgba(255,255,255,0.08); border: 2px solid rgba(255,255,255,0.25); border-radius: 4px 4px 2px 2px; position: relative; overflow: hidden; }
+.burette-liquid { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(to bottom, rgba(56,189,248,0.3), rgba(56,189,248,0.6)); transition: height 0.5s ease; }
+.burette-tick { position: absolute; right: 0; width: 8px; height: 1px; background: rgba(255,255,255,0.3); }
+.burette-tick-major { width: 14px; background: rgba(255,255,255,0.5); }
+.burette-stopcock { width: 48px; height: 10px; background: #94a3b8; border-radius: 3px; margin: 2px auto; position: relative; }
+.burette-tip { width: 4px; height: 18px; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); margin: 0 auto; border-radius: 0 0 2px 2px; }
+
+.drip { position: absolute; width: 4px; height: 8px; background: rgba(56,189,248,0.7); border-radius: 0 0 50% 50%; animation: drip-fall 0.6s ease-in forwards; left: 50%; transform: translateX(-50%); }
+@keyframes drip-fall { 0% { top: 0; opacity: 1; } 100% { top: 80px; opacity: 0; } }
+
+/* Flask */
+.flask-body { position: relative; }
+.flask-neck { width: 28px; height: 30px; background: rgba(255,255,255,0.06); border: 2px solid rgba(255,255,255,0.2); border-bottom: none; margin: 0 auto; border-radius: 4px 4px 0 0; }
+.flask-bowl { width: 120px; height: 90px; background: rgba(255,255,255,0.06); border: 2px solid rgba(255,255,255,0.2); border-radius: 10px 10px 50% 50%; position: relative; overflow: hidden; }
+.flask-liquid { position: absolute; bottom: 0; left: 0; right: 0; transition: height 0.5s ease, background 0.5s ease; }
+
+/* pH Electrode */
+.electrode { width: 6px; height: 50px; background: linear-gradient(to bottom, #64748b, #475569); border-radius: 2px 2px 4px 4px; position: absolute; right: 12px; top: 15px; z-index: 2; }
+.electrode-tip { width: 8px; height: 12px; background: #94a3b8; border-radius: 0 0 5px 5px; position: absolute; bottom: -12px; left: -1px; }
+.electrode-wire { width: 2px; height: 16px; background: #64748b; position: absolute; top: -16px; left: 2px; }
+
+/* Graph */
+.graph-container { position: relative; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
+::-webkit-scrollbar-thumb { background: rgba(56,189,248,0.3); border-radius: 3px; }
+
+.btn-primary { background: var(--primary); color: #0f1729; font-weight: 600; border-radius: 8px; padding: 8px 16px; transition: all 0.2s; }
+.btn-primary:hover { filter: brightness(1.15); transform: translateY(-1px); }
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; filter: none; }
+.btn-secondary { background: rgba(100,116,139,0.3); color: var(--text); border: 1px solid rgba(100,116,139,0.4); font-weight: 500; border-radius: 8px; padding: 8px 16px; transition: all 0.2s; }
+.btn-secondary:hover { background: rgba(100,116,139,0.5); }
+
+.toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); padding: 12px 24px; border-radius: 10px; font-weight: 500; z-index: 100; animation: toast-in 0.3s ease; }
+@keyframes toast-in { from { opacity:0; transform: translateX(-50%) translateY(-10px); } to { opacity:1; transform: translateX(-50%) translateY(0); } }
+.toast-success { background: #065f46; color: #6ee7b7; border: 1px solid #059669; }
+.toast-error { background: #7f1d1d; color: #fca5a5; border: 1px solid #dc2626; }
+.toast-info { background: #1e3a5f; color: #93c5fd; border: 1px solid #3b82f6; }
+
+.volume-label { font-size: 10px; position: absolute; right: 42px; color: rgba(255,255,255,0.5); }
+
+.ph-display { font-size: 2rem; font-weight: 700; }
+
+.setup-overlay { position: absolute; inset: 0; background: rgba(15,23,41,0.92); backdrop-filter: blur(4px); z-index: 50; display: flex; align-items: center; justify-content: center; border-radius: 12px; }
+
+input[type="number"] { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); color: var(--text); border-radius: 6px; padding: 6px 10px; }
+input[type="number"]:focus { outline: none; border-color: var(--primary); }
+</style>
+  <style>body { box-sizing: border-box; }</style>
+  <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
+ </head>
+ <body class="h-full lab-bg overflow-auto">
+  <div id="app" class="w-full h-full flex flex-col" style="min-height: 100%;">
+   <!-- Header -->
+   <header class="px-4 py-3 flex items-center justify-between border-b border-white/10 flex-shrink-0">
+    <div class="flex items-center gap-3">
+     <div class="w-9 h-9 rounded-lg flex items-center justify-center" style="background: var(--primary);">
+      <i data-lucide="flask-conical" style="width:20px;height:20px;color:#0f1729;"></i>
+     </div>
+     <h1 id="lab-title" class="text-lg font-bold" style="color: var(--primary);">Virtual Titration Lab</h1>
+    </div>
+    <div class="flex items-center gap-2">
+     <button onclick="downloadCSV()" class="btn-secondary text-sm flex items-center gap-1" id="btn-download" disabled> <i data-lucide="download" style="width:14px;height:14px;"></i> CSV </button> <button onclick="resetExperiment()" class="btn-secondary text-sm flex items-center gap-1"> <i data-lucide="rotate-ccw" style="width:14px;height:14px;"></i> Reset </button>
+    </div>
+   </header><!-- Main content -->
+   <div class="flex-1 flex flex-col lg:flex-row gap-3 p-3 overflow-auto">
+    <!-- Left: Lab Bench -->
+    <div class="card p-4 flex-shrink-0 lg:w-[340px] relative" id="bench-card">
+     <!-- Setup overlay -->
+     <div id="setup-overlay" class="setup-overlay">
+      <div class="text-center p-6">
+       <div class="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4" style="background:rgba(56,189,248,0.15);">
+        <i data-lucide="beaker" style="width:28px;height:28px;color:var(--primary);"></i>
+       </div>
+       <h2 class="text-lg font-bold mb-1">Set Up Experiment</h2>
+       <p class="text-sm mb-4" style="color:var(--secondary);">Select volume of unknown acid HX<br>
+         to place in the receiving flask.</p><label class="block text-sm font-medium mb-2 text-left">Volume of HX (mL):</label>
+       <div class="flex gap-2 mb-4 flex-wrap justify-center">
+        <button onclick="selectAcidVolume(10)" class="vol-btn btn-secondary text-sm px-3 py-2">10 mL</button> <button onclick="selectAcidVolume(15)" class="vol-btn btn-secondary text-sm px-3 py-2">15 mL</button> <button onclick="selectAcidVolume(20)" class="vol-btn btn-secondary text-sm px-3 py-2">20 mL</button> <button onclick="selectAcidVolume(25)" class="vol-btn btn-secondary text-sm px-3 py-2">25 mL</button> <button onclick="selectAcidVolume(30)" class="vol-btn btn-secondary text-sm px-3 py-2">30 mL</button>
+       </div>
+       <div class="flex items-center gap-2 mb-4">
+        <label class="text-sm">Custom (mL):</label> <input type="number" id="custom-vol" min="5" max="50" step="1" class="w-20 text-sm" placeholder="5–50"> <button onclick="selectAcidVolume(parseFloat(document.getElementById('custom-vol').value))" class="btn-primary text-sm px-3 py-1">Set</button>
+       </div><button onclick="startExperiment()" id="btn-start" class="btn-primary w-full py-2" disabled> Fill Flask &amp; Begin </button>
+       <p id="setup-error" class="text-xs mt-2" style="color:#f87171;display:none;"></p>
+      </div>
+     </div>
+     <h2 class="text-sm font-semibold mb-2 uppercase tracking-wider" style="color:var(--secondary);">Lab Bench</h2><!-- Info bar -->
+     <div id="info-bar" class="mb-2 p-1.5 rounded-lg text-xs mono" style="background:rgba(56,189,248,0.08);display:none;">
+      <span>HX: <strong id="info-acid-vol">—</strong> mL</span> <span class="mx-1">|</span> <span>NaOH: <strong id="info-naoh-vol">0.000</strong> mL</span> <span class="mx-1">|</span> <span>Burette: <strong id="info-burette-vol">50.00</strong> mL</span>
+     </div><!-- Apparatus -->
+     <div class="flex flex-col justify-end items-center mb-3" style="min-height: 290px;">
+      <!-- Burette assembly -->
+      <div class="flex flex-col items-center z-10">
+       <div class="text-xs mb-1 font-medium" style="color:var(--primary);">
+        Burette
+       </div>
+       <div class="text-[9px] mb-1 mono" style="color:var(--secondary);" id="burette-label">
+        0.100 M NaOH
+       </div>
+       <div class="relative">
+        <!-- Scaled down burette -->
+        <div class="burette-outer" id="burette" style="width:24px;height:130px;">
+         <div class="burette-liquid" id="burette-liquid" style="height:0%;"></div>
+        </div>
+        <div class="volume-label" style="top:0;font-size:8px;right:30px;">
+         0
+        </div>
+        <div class="volume-label" style="top:24%;font-size:8px;right:30px;">
+         12.5
+        </div>
+        <div class="volume-label" style="top:49%;font-size:8px;right:30px;">
+         25
+        </div>
+        <div class="volume-label" style="top:74%;font-size:8px;right:30px;">
+         37.5
+        </div>
+        <div class="volume-label" style="bottom:0;font-size:8px;right:30px;">
+         50
+        </div>
+       </div>
+       <div class="burette-stopcock" id="stopcock" style="width:32px;height:8px;"></div>
+       <div class="burette-tip relative" id="burette-tip" style="height:14px;"></div>
+       <div style="height:12px;position:relative;width:4px;" id="drip-zone"></div>
+      </div>
+
+      <!-- Flask assembly -->
+      <div class="flex flex-col items-center" style="margin-top: -8px;">
+       <div class="flask-body relative">
+        <!-- Scaled down flask and probe -->
+        <div class="flask-neck relative" style="width:24px;height:24px;margin:0 auto;border-radius:4px 4px 0 0;">
+         <div class="electrode" id="electrode" style="display:none;width:5px;height:45px;right:8px;top:8px;">
+          <div class="electrode-wire" style="height:16px;top:-16px;left:1.5px;"></div>
+          <div class="electrode-tip" style="width:7px;height:10px;bottom:-10px;left:-1px;"></div>
+         </div>
+        </div>
+        <div class="flask-bowl" style="width:80px;height:65px;">
+         <div class="flask-liquid" id="flask-liquid" style="height:0%;background:transparent;"></div>
+        </div>
+       </div>
+       <div class="text-[9px] mt-1 mono" id="flask-label" style="color:var(--secondary);">
+        Empty
+       </div>
+       <div class="text-xs mt-0.5 font-medium" style="color:var(--primary);">
+        Receiving Flask
+       </div>
+      </div>
+     </div><!-- pH Display -->
+     <div class="card p-2 text-center mb-2" style="background:rgba(0,0,0,0.3);">
+      <div class="text-xs uppercase tracking-wider mb-0.5" style="color:var(--secondary);">
+       pH Sensor
+      </div>
+      <div class="ph-display mono" id="ph-display" style="color:var(--primary);font-size:1.5rem;">
+       —
+      </div>
+     </div><!-- Controls -->
+     <div id="controls" style="display:none;">
+      <div class="text-xs font-semibold mb-1.5 uppercase tracking-wider" style="color:var(--secondary);">
+       Add NaOH
+      </div>
+      <div class="grid grid-cols-3 gap-1 mb-1.5">
+       <button onclick="addNaOH(0.05)" class="btn-secondary text-xs py-1.5 px-1">1 drop<br><span class="mono text-8px">0.05</span></button> <button onclick="addNaOH(0.10)" class="btn-secondary text-xs py-1.5 px-1">2 drops<br><span class="mono text-8px">0.10</span></button> <button onclick="addNaOH(0.20)" class="btn-secondary text-xs py-1.5 px-1">4 drops<br><span class="mono text-8px">0.20</span></button>
+      </div>
+      <div class="grid grid-cols-3 gap-1 mb-1.5">
+       <button onclick="addNaOH(0.50)" class="btn-secondary text-xs py-1.5 mono">0.50</button> <button onclick="addNaOH(1.00)" class="btn-secondary text-xs py-1.5 mono">1.00</button> <button onclick="addNaOH(2.00)" class="btn-secondary text-xs py-1.5 mono">2.00</button>
+      </div>
+      <div class="flex gap-1 items-center mb-2">
+       <label class="text-xs">Custom:</label> <input type="number" id="custom-add" min="0.01" max="5" step="0.01" class="w-16 text-xs px-1 py-1" placeholder="0.01"> <button onclick="addCustom()" class="btn-primary text-xs px-2 py-1">Add</button>
+      </div><button onclick="refillBurette()" id="btn-refill" class="btn-secondary text-xs w-full py-1.5 flex items-center justify-center gap-1" style="display:none;"> <i data-lucide="droplets" style="width:12px;height:12px;"></i> Refill </button>
+     </div>
+    </div><!-- Right: Graph + Data + Answer -->
+    <div class="flex-1 flex flex-col gap-3 min-w-0">
+     <!-- Graph -->
+     <div class="card p-4 flex-1 min-h-[280px]">
+      <h2 class="text-sm font-semibold mb-2 uppercase tracking-wider" style="color:var(--secondary);">Titration Curve</h2>
+      <div class="graph-container w-full" style="height: calc(100% - 28px);" id="graph-wrap">
+       <canvas id="graph-canvas" style="width:100%;height:100%;"></canvas>
+      </div>
+     </div><!-- Data Table + Answer in row -->
+     <div class="flex flex-col md:flex-row gap-3">
+      <!-- Data Table -->
+      <div class="card p-4 flex-1 max-h-[260px] overflow-auto">
+       <h2 class="text-sm font-semibold mb-2 uppercase tracking-wider" style="color:var(--secondary);">Titration Data</h2>
+       <table class="w-full text-xs mono">
+        <thead>
+         <tr class="border-b border-white/10">
+          <th class="text-left py-1 pr-3">#</th>
+          <th class="text-left py-1 pr-3">Vol NaOH (mL)</th>
+          <th class="text-left py-1">pH</th>
+         </tr>
+        </thead>
+        <tbody id="data-tbody">
+         <tr>
+          <td colspan="3" class="py-4 text-center" style="color:var(--secondary);">No data yet</td>
+         </tr>
+        </tbody>
+       </table>
+      </div><!-- Answer Check -->
+      <div class="card p-4 flex-1 max-h-[260px]" id="answer-card">
+       <h2 class="text-sm font-semibold mb-3 uppercase tracking-wider" style="color:var(--secondary);">Check Your Answers</h2>
+       <div class="space-y-3">
+        <div>
+         <label class="text-xs block mb-1">Molarity of HX (M):</label> <input type="number" id="answer-molarity" step="0.001" min="0" max="1" class="w-full text-sm" placeholder="e.g. 0.120">
+        </div>
+        <div>
+         <label class="text-xs block mb-1">pKa of HX:</label> <input type="number" id="answer-pka" step="0.01" min="0" max="14" class="w-full text-sm" placeholder="e.g. 4.75">
+        </div><button onclick="checkAnswers()" class="btn-primary w-full text-sm py-2" id="btn-check">Check Answers</button>
+        <div id="answer-feedback" class="text-xs" style="display:none;"></div>
+       </div>
+      </div>
+     </div>
+    </div>
+   </div>
+  </div>
+  <div id="toast-container"></div>
+  <script>
+// ============ Chemistry Engine ============
+let trueConc, truePKa, trueKa;
+let acidVolume = 0; // mL
+let molesAcidInitial = 0;
+let naohAdded = 0; // mL total
+let buretteRemaining = 50; // mL
+const naohConc = 0.100; // M
+let data = []; // {vol, ph}
+let experimentStarted = false;
+
+function generateUnknown() {
+  trueConc = +(Math.random() * 0.200 + 0.050).toFixed(4);
+  truePKa = +(Math.random() * 2.6 + 3.1).toFixed(3);
+  trueKa = Math.pow(10, -truePKa);
+}
+generateUnknown();
+
+function calcPH(volNaOH_mL) {
+  const volAcid_L = acidVolume / 1000;
+  const volBase_L = volNaOH_mL / 1000;
+  const totalVol_L = volAcid_L + volBase_L;
+  const molesBase = naohConc * volBase_L;
+  const molesAcid = trueConc * volAcid_L;
+  const remaining_acid = molesAcid - molesBase;
+  const cHA = remaining_acid / totalVol_L;
+  const cA = molesBase / totalVol_L;
+
+  if (remaining_acid > 1e-10) {
+    // HA still present
+    if (molesBase < 1e-12) {
+      // Pure weak acid: Ka = H^2 / (C - H), approximate H = sqrt(Ka * C)
+      const H = Math.sqrt(trueKa * cHA);
+      return -Math.log10(Math.max(H, 1e-14));
+    }
+    // Buffer region: Henderson-Hasselbalch
+    return truePKa + Math.log10(cA / cHA);
+  } else if (Math.abs(remaining_acid) < 1e-10) {
+    // Equivalence point: all HA converted to A-
+    const Kb = 1e-14 / trueKa;
+    const OH = Math.sqrt(Kb * cA);
+    return 14 + Math.log10(Math.max(OH, 1e-14));
+  } else {
+    // Excess base: past equivalence point
+    const excessBase = molesBase - molesAcid;
+    const OH = excessBase / totalVol_L;
+    return 14 + Math.log10(Math.max(OH, 1e-14));
+  }
+}
+
+// ============ UI State ============
+let selectedAcidVol = null;
+
+function selectAcidVolume(v) {
+  if (isNaN(v) || v < 5 || v > 50) {
+    showSetupError('Please select a volume between 5 and 50 mL.');
+    return;
+  }
+  selectedAcidVol = Math.round(v * 10) / 10;
+  document.querySelectorAll('.vol-btn').forEach(b => {
+    b.style.borderColor = parseFloat(b.textContent) === selectedAcidVol ? 'var(--primary)' : '';
+    b.style.background = parseFloat(b.textContent) === selectedAcidVol ? 'rgba(56,189,248,0.2)' : '';
+  });
+  document.getElementById('btn-start').disabled = false;
+  hideSetupError();
+}
+
+function showSetupError(msg) {
+  const el = document.getElementById('setup-error');
+  el.textContent = msg; el.style.display = 'block';
+}
+function hideSetupError() {
+  document.getElementById('setup-error').style.display = 'none';
+}
+
+function startExperiment() {
+  if (!selectedAcidVol) return;
+  acidVolume = selectedAcidVol;
+  molesAcidInitial = trueConc * (acidVolume / 1000) * 1000; // mmol
+  naohAdded = 0;
+  buretteRemaining = 50;
+  data = [];
+  experimentStarted = true;
+
+  // UI
+  document.getElementById('setup-overlay').style.display = 'none';
+  document.getElementById('info-bar').style.display = 'block';
+  document.getElementById('info-acid-vol').textContent = acidVolume.toFixed(1);
+  document.getElementById('controls').style.display = 'block';
+  document.getElementById('electrode').style.display = 'block';
+  document.getElementById('btn-download').disabled = false;
+
+  updateBurette();
+  updateFlask();
+  updateInfoBar();
+
+  // Record initial point
+  const ph0 = calcPH(0);
+  data.push({ vol: 0, ph: +ph0.toFixed(2) });
+  updatePHDisplay(ph0);
+  updateTable();
+  drawGraph();
+  showToast('Experiment started! Add NaOH from the burette.', 'info');
+}
+
+function addNaOH(vol) {
+  if (!experimentStarted) return;
+  if (vol <= 0 || vol > 5) return;
+  if (buretteRemaining < 0.01) {
+    showToast('Burette is empty! Refill to continue.', 'error');
+    return;
+  }
+  const actual = Math.min(vol, buretteRemaining);
+  buretteRemaining = +(buretteRemaining - actual).toFixed(4);
+  naohAdded = +(naohAdded + actual).toFixed(4);
+
+  const ph = calcPH(naohAdded);
+  data.push({ vol: +naohAdded.toFixed(3), ph: +ph.toFixed(2) });
+
+  updatePHDisplay(ph);
+  updateBurette();
+  updateFlask();
+  updateInfoBar();
+  updateTable();
+  drawGraph();
+  animateDrip();
+
+  if (buretteRemaining < 0.01) {
+    document.getElementById('btn-refill').style.display = 'flex';
+  }
+}
+
+function addCustom() {
+  const v = parseFloat(document.getElementById('custom-add').value);
+  if (isNaN(v) || v < 0.01 || v > 5) {
+    showToast('Enter a volume between 0.01 and 5.00 mL.', 'error');
+    return;
+  }
+  addNaOH(Math.round(v * 100) / 100);
+  document.getElementById('custom-add').value = '';
+}
+
+function refillBurette() {
+  buretteRemaining = 50;
+  updateBurette();
+  updateInfoBar();
+  document.getElementById('btn-refill').style.display = 'none';
+  showToast('Burette refilled with 50 mL of 0.100 M NaOH.', 'info');
+}
+
+function resetExperiment() {
+  generateUnknown();
+  experimentStarted = false;
+  selectedAcidVol = null;
+  acidVolume = 0;
+  naohAdded = 0;
+  buretteRemaining = 50;
+  data = [];
+
+  document.getElementById('setup-overlay').style.display = 'flex';
+  document.getElementById('info-bar').style.display = 'none';
+  document.getElementById('controls').style.display = 'none';
+  document.getElementById('electrode').style.display = 'none';
+  document.getElementById('btn-start').disabled = true;
+  document.getElementById('btn-download').disabled = true;
+  document.getElementById('btn-refill').style.display = 'none';
+  document.getElementById('ph-display').textContent = '—';
+  document.getElementById('flask-label').textContent = 'Empty';
+  document.getElementById('flask-liquid').style.height = '0%';
+  document.getElementById('burette-liquid').style.height = '0%';
+  document.getElementById('answer-molarity').value = '';
+  document.getElementById('answer-pka').value = '';
+  document.getElementById('answer-feedback').style.display = 'none';
+  document.querySelectorAll('.vol-btn').forEach(b => { b.style.borderColor = ''; b.style.background = ''; });
+  document.getElementById('custom-vol').value = '';
+
+  updateTable();
+  drawGraph();
+  showToast('Experiment reset with a new unknown acid.', 'info');
+}
+
+// ============ Visual Updates ============
+function updateBurette() {
+  const pct = (buretteRemaining / 50) * 100;
+  document.getElementById('burette-liquid').style.height = pct + '%';
+}
+
+function updateFlask() {
+  const totalVol = acidVolume + naohAdded;
+  const maxVol = acidVolume + 60;
+  const pct = Math.min((totalVol / maxVol) * 80 + 10, 90);
+  const fl = document.getElementById('flask-liquid');
+  fl.style.height = pct + '%';
+
+  // Color based on pH
+  if (data.length > 0) {
+    const ph = data[data.length - 1].ph;
+    fl.style.background = phToColor(ph);
+  } else {
+    fl.style.background = 'rgba(251,191,36,0.4)';
+  }
+
+  document.getElementById('flask-label').textContent = 'HX + NaOH';
+}
+
+function phToColor(ph) {
+  if (ph < 4) return 'rgba(239,68,68,0.45)';
+  if (ph < 5) return 'rgba(249,115,22,0.4)';
+  if (ph < 6) return 'rgba(234,179,8,0.4)';
+  if (ph < 7) return 'rgba(250,204,21,0.35)';
+  if (ph < 8) return 'rgba(74,222,128,0.35)';
+  if (ph < 9) return 'rgba(34,197,94,0.35)';
+  if (ph < 10) return 'rgba(45,212,191,0.35)';
+  if (ph < 11) return 'rgba(56,189,248,0.4)';
+  return 'rgba(99,102,241,0.45)';
+}
+
+function updatePHDisplay(ph) {
+  document.getElementById('ph-display').textContent = ph.toFixed(2);
+}
+
+function updateInfoBar() {
+  document.getElementById('info-naoh-vol').textContent = naohAdded.toFixed(3);
+  document.getElementById('info-burette-vol').textContent = buretteRemaining.toFixed(2);
+}
+
+function updateTable() {
+  const tbody = document.getElementById('data-tbody');
+  if (data.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="3" class="py-4 text-center" style="color:var(--secondary);">No data yet</td></tr>';
+    return;
+  }
+  // Efficient update: only add new rows
+  const existingRows = tbody.querySelectorAll('tr[data-idx]');
+  if (existingRows.length === 0 && data.length > 0) {
+    tbody.innerHTML = '';
+  }
+  for (let i = existingRows.length; i < data.length; i++) {
+    const tr = document.createElement('tr');
+    tr.dataset.idx = i;
+    tr.className = 'border-b border-white/5';
+    tr.innerHTML = `<td class="py-1 pr-3">${i + 1}</td><td class="py-1 pr-3">${data[i].vol.toFixed(3)}</td><td class="py-1">${data[i].ph.toFixed(2)}</td>`;
+    tbody.appendChild(tr);
+  }
+  // Scroll to bottom
+  tbody.parentElement.scrollTop = tbody.parentElement.scrollHeight;
+}
+
+function animateDrip() {
+  const zone = document.getElementById('drip-zone');
+  const drip = document.createElement('div');
+  drip.className = 'drip';
+  zone.appendChild(drip);
+  setTimeout(() => drip.remove(), 700);
+}
+
+// ============ Graph Drawing ============
+function drawGraph() {
+  const canvas = document.getElementById('graph-canvas');
+  const wrap = document.getElementById('graph-wrap');
+  const rect = wrap.getBoundingClientRect();
+  canvas.width = rect.width * 2;
+  canvas.height = rect.height * 2;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(2, 2);
+  const W = rect.width, H = rect.height;
+
+  ctx.clearRect(0, 0, W, H);
+
+  const pad = { top: 20, right: 20, bottom: 40, left: 45 };
+  const gW = W - pad.left - pad.right;
+  const gH = H - pad.top - pad.bottom;
+
+  // Determine axis ranges
+  const maxVol = data.length > 1 ? Math.max(data[data.length - 1].vol * 1.2, 5) : 10;
+  const minPH = 0, maxPH = 14;
+
+  const toX = v => pad.left + (v / maxVol) * gW;
+  const toY = p => pad.top + (1 - (p - minPH) / (maxPH - minPH)) * gH;
+
+  // Grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.lineWidth = 1;
+  for (let p = 0; p <= 14; p += 2) {
+    const y = toY(p);
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + gW, y); ctx.stroke();
+  }
+  const volStep = maxVol <= 10 ? 2 : maxVol <= 30 ? 5 : 10;
+  for (let v = 0; v <= maxVol; v += volStep) {
+    const x = toX(v);
+    ctx.beginPath(); ctx.moveTo(x, pad.top); ctx.lineTo(x, pad.top + gH); ctx.stroke();
+  }
+
+  // Axes
+  ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(pad.left, pad.top); ctx.lineTo(pad.left, pad.top + gH); ctx.lineTo(pad.left + gW, pad.top + gH);
+  ctx.stroke();
+
+  // Labels
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.font = '10px "JetBrains Mono", monospace';
+  ctx.textAlign = 'center';
+  for (let v = 0; v <= maxVol; v += volStep) {
+    ctx.fillText(v.toFixed(0), toX(v), pad.top + gH + 16);
+  }
+  ctx.textAlign = 'right';
+  for (let p = 0; p <= 14; p += 2) {
+    ctx.fillText(p.toString(), pad.left - 8, toY(p) + 3);
+  }
+
+  // Axis titles
+  ctx.fillStyle = 'rgba(255,255,255,0.6)';
+  ctx.font = '11px "IBM Plex Sans", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('Volume NaOH (mL)', pad.left + gW / 2, H - 4);
+  ctx.save();
+  ctx.translate(12, pad.top + gH / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText('pH', 0, 0);
+  ctx.restore();
+
+  if (data.length < 1) return;
+
+  // Plot line
+  ctx.strokeStyle = '#38bdf8';
+  ctx.lineWidth = 2;
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  data.forEach((d, i) => {
+    const x = toX(d.vol), y = toY(d.ph);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  // Plot points
+  data.forEach(d => {
+    const x = toX(d.vol), y = toY(d.ph);
+    ctx.beginPath();
+    ctx.arc(x, y, 3, 0, Math.PI * 2);
+    ctx.fillStyle = '#38bdf8';
+    ctx.fill();
+  });
+}
+
+// Redraw on resize
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(drawGraph, 100);
+});
+
+// ============ CSV Download ============
+function downloadCSV() {
+  if (data.length === 0) return;
+  let csv = 'Point,Volume NaOH (mL),pH\n';
+  data.forEach((d, i) => {
+    csv += `${i + 1},${d.vol.toFixed(3)},${d.ph.toFixed(2)}\n`;
+  });
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `titration_data_${acidVolume}mL_HX.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('CSV downloaded!', 'success');
+}
+
+// ============ Answer Check ============
+function checkAnswers() {
+  const mInput = parseFloat(document.getElementById('answer-molarity').value);
+  const pkaInput = parseFloat(document.getElementById('answer-pka').value);
+  const fb = document.getElementById('answer-feedback');
+  fb.style.display = 'block';
+
+  if (isNaN(mInput) || isNaN(pkaInput)) {
+    fb.innerHTML = '<span style="color:#fca5a5;">Please enter both values.</span>';
+    return;
+  }
+
+  const mTol = trueConc * 0.05;
+  const mCorrect = Math.abs(mInput - trueConc) <= mTol;
+  const pkaCorrect = Math.abs(pkaInput - truePKa) <= 0.20;
+
+  let html = '';
+  if (mCorrect) {
+    html += '<div style="color:#6ee7b7;margin-bottom:4px;">✓ Molarity is correct!</div>';
+  } else {
+    html += `<div style="color:#fca5a5;margin-bottom:4px;">✗ Molarity is not within 5% of the true value. (Your answer: ${mInput.toFixed(4)} M)</div>`;
+  }
+  if (pkaCorrect) {
+    html += '<div style="color:#6ee7b7;">✓ pKa is correct!</div>';
+  } else {
+    html += `<div style="color:#fca5a5;">✗ pKa is not within ±0.20 of the true value. (Your answer: ${pkaInput.toFixed(2)})</div>`;
+  }
+
+  if (mCorrect && pkaCorrect) {
+    html += '<div style="color:#38bdf8;margin-top:6px;font-weight:600;">🎉 Excellent work! Both answers are correct!</div>';
+    html += `<div style="color:var(--secondary);margin-top:4px;">True values: M = ${trueConc.toFixed(4)}, pKa = ${truePKa.toFixed(3)}</div>`;
+  } else {
+    html += '<div style="color:var(--secondary);margin-top:6px;">Hint: The equivalence point is where pH changes most rapidly. At half-equivalence, pH = pKa.</div>';
+  }
+
+  fb.innerHTML = html;
+}
+
+// ============ Toast ============
+function showToast(msg, type) {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  toast.textContent = msg;
+  container.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
+
+// ============ Element SDK ============
+const defaultConfig = {
+  lab_title: 'Virtual Titration Lab',
+  background_color: '#0f1729',
+  surface_color: '#1a2540',
+  text_color: '#e2e8f0',
+  primary_color: '#38bdf8',
+  secondary_color: '#64748b',
+  font_family: 'IBM Plex Sans',
+  font_size: 14
+};
+
+function applyConfig(config) {
+  const c = { ...defaultConfig, ...config };
+
+  document.documentElement.style.setProperty('--bg', c.background_color);
+  document.documentElement.style.setProperty('--surface', c.surface_color);
+  document.documentElement.style.setProperty('--text', c.text_color);
+  document.documentElement.style.setProperty('--primary', c.primary_color);
+  document.documentElement.style.setProperty('--secondary', c.secondary_color);
+
+  document.getElementById('lab-title').textContent = c.lab_title;
+
+  document.body.style.fontFamily = `${c.font_family}, IBM Plex Sans, sans-serif`;
+  document.body.style.fontSize = c.font_size + 'px';
+
+  // Re-color dynamic elements
+  document.getElementById('ph-display').style.color = c.primary_color;
+  document.querySelectorAll('.btn-primary').forEach(b => b.style.background = c.primary_color);
+
+  if (experimentStarted) drawGraph();
+}
+
+if (window.elementSdk) {
+  window.elementSdk.init({
+    defaultConfig,
+    onConfigChange: async (config) => applyConfig(config),
+    mapToCapabilities: (config) => ({
+      recolorables: [
+        { get: () => config.background_color || defaultConfig.background_color, set: v => { config.background_color = v; window.elementSdk.setConfig({ background_color: v }); } },
+        { get: () => config.surface_color || defaultConfig.surface_color, set: v => { config.surface_color = v; window.elementSdk.setConfig({ surface_color: v }); } },
+        { get: () => config.text_color || defaultConfig.text_color, set: v => { config.text_color = v; window.elementSdk.setConfig({ text_color: v }); } },
+        { get: () => config.primary_color || defaultConfig.primary_color, set: v => { config.primary_color = v; window.elementSdk.setConfig({ primary_color: v }); } },
+        { get: () => config.secondary_color || defaultConfig.secondary_color, set: v => { config.secondary_color = v; window.elementSdk.setConfig({ secondary_color: v }); } },
+      ],
+      borderables: [],
+      fontEditable: { get: () => config.font_family || defaultConfig.font_family, set: v => { config.font_family = v; window.elementSdk.setConfig({ font_family: v }); } },
+      fontSizeable: { get: () => config.font_size || defaultConfig.font_size, set: v => { config.font_size = v; window.elementSdk.setConfig({ font_size: v }); } },
+    }),
+    mapToEditPanelValues: (config) => new Map([
+      ['lab_title', config.lab_title || defaultConfig.lab_title],
+    ])
+  });
+}
+
+// Init
+lucide.createIcons();
+drawGraph();
+</script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9e190f56b5bdd1b4',t:'MTc3NDM5MDc5Mi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
