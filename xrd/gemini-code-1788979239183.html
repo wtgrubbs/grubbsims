@@ -1,0 +1,1211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>X-Ray Diffraction (XRD) Simulator</title>
+    
+    <!-- MathJax Configuration and Script for rendering LaTeX -->
+    <script>
+        MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']]
+            }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --panel-bg: #1e293b;
+            --accent-color: #38bdf8;
+            --accent-glow: rgba(56, 189, 248, 0.3);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border-color: #334155;
+            --modal-bg: #0f172a;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        header {
+            background-color: var(--panel-bg);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--accent-color);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .header-btn {
+            background: linear-gradient(135deg, #0284c7, #2563eb);
+            color: white;
+            border: none;
+            padding: 0.6rem 1.2rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            box-shadow: 0 0 10px var(--accent-glow);
+        }
+
+        .header-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 15px var(--accent-glow);
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 320px 1fr 420px;
+            gap: 1.2rem;
+            padding: 1.2rem;
+            flex: 1;
+        }
+
+        @media (max-width: 1200px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .panel {
+            background-color: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 1.2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.2rem;
+        }
+        
+        .middle-column {
+            display: flex;
+            flex-direction: column;
+            gap: 1.2rem;
+        }
+
+        .panel-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.5rem;
+            color: #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* Controls */
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .value-badge {
+            color: var(--accent-color);
+            font-weight: bold;
+        }
+
+        select, input[type="range"] {
+            width: 100%;
+            background: #0f172a;
+            border: 1px solid var(--border-color);
+            color: white;
+            padding: 0.5rem;
+            border-radius: 6px;
+            outline: none;
+        }
+
+        input[type="range"] {
+            accent-color: var(--accent-color);
+            cursor: pointer;
+        }
+
+        .preset-buttons {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.4rem;
+        }
+
+        .btn-sm {
+            background: #334155;
+            color: #cbd5e1;
+            border: none;
+            padding: 0.4rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-sm:hover {
+            background: #475569;
+            color: white;
+        }
+
+        /* Displays */
+        .canvas-container {
+            position: relative;
+            width: 100%;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border: 1px solid var(--border-color);
+        }
+
+        canvas {
+            display: block;
+        }
+
+        #millerCanvas, #unitCellCanvas {
+            cursor: grab;
+        }
+        
+        #millerCanvas:active, #unitCellCanvas:active {
+            cursor: grabbing;
+        }
+
+        .unit-cell-box {
+            height: 180px;
+            background: #090d16;
+            border-radius: 8px;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+        }
+
+        /* Table Data */
+        .table-container {
+            max-height: 250px;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8rem;
+            text-align: left;
+        }
+
+        th, td {
+            padding: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            background-color: #0f172a;
+            color: var(--accent-color);
+            position: sticky;
+            top: 0;
+        }
+
+        tr:hover {
+            background-color: #1e293b;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            backdrop-filter: blur(4px);
+        }
+
+        .modal-content {
+            background-color: var(--modal-bg);
+            border: 1px solid var(--border-color);
+            width: 90%;
+            max-width: 850px;
+            max-height: 85vh;
+            border-radius: 12px;
+            padding: 2rem;
+            overflow-y: auto;
+            position: relative;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        .close-btn:hover { color: white; }
+
+        .modal-content h2 {
+            color: var(--accent-color);
+            margin-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.5rem;
+        }
+
+        .modal-content h3 {
+            color: #cbd5e1;
+            margin: 1.2rem 0 0.5rem 0;
+        }
+
+        .modal-content p, .modal-content li {
+            font-size: 0.95rem;
+            line-height: 1.6;
+            color: #94a3b8;
+            margin-bottom: 0.8rem;
+        }
+
+        .modal-content ul {
+            padding-left: 1.2rem;
+        }
+
+        .formula-box {
+            background: #1e293b;
+            padding: 0.5rem 1rem;
+            border-left: 4px solid var(--accent-color);
+            margin: 1rem 0;
+            color: #e2e8f0;
+            overflow-x: auto;
+        }
+        
+        .overlay-text {
+            position: absolute;
+            top: 8px;
+            left: 10px;
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 0.75rem;
+            pointer-events: none;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>
+            </svg>
+            X-Ray Diffraction (XRD) Simulator
+        </h1>
+        <button class="header-btn" id="openTheoryBtn">Underlying Theory</button>
+    </header>
+
+    <div class="container">
+        <!-- Left: Control Panel -->
+        <div class="panel">
+            <div class="panel-title">Experimental Parameters</div>
+
+            <div class="control-group">
+                <label for="crystalType">Cubic Crystal Structure</label>
+                <select id="crystalType">
+                    <option value="SC">Primitive Cubic (SC)</option>
+                    <option value="BCC">Body-Centered Cubic (BCC)</option>
+                    <option value="FCC" selected>Face-Centered Cubic (FCC)</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label>Preset Elemental Samples</label>
+                <div class="preset-buttons">
+                    <button class="btn-sm" onclick="setPreset('Cu')">Copper (FCC)</button>
+                    <button class="btn-sm" onclick="setPreset('Fe')">Iron (BCC)</button>
+                    <button class="btn-sm" onclick="setPreset('Po')">Polonium (SC)</button>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label for="latticeConst">Lattice Parameter (a) <span class="value-badge" id="latticeVal">0.361 nm</span></label>
+                <input type="range" id="latticeConst" min="0.200" max="0.600" step="0.001" value="0.361">
+            </div>
+
+            <div class="control-group">
+                <label for="wavelength">X-Ray Wavelength (&lambda;) <span class="value-badge" id="waveVal">0.154 nm</span></label>
+                <input type="range" id="wavelength" min="0.050" max="0.250" step="0.001" value="0.154">
+            </div>
+
+            <div class="control-group">
+                <label>Common X-Ray Sources</label>
+                <div class="preset-buttons">
+                    <button class="btn-sm" onclick="setWavelength(0.15418)">Cu K-&alpha;</button>
+                    <button class="btn-sm" onclick="setWavelength(0.07107)">Mo K-&alpha;</button>
+                    <button class="btn-sm" onclick="setWavelength(0.05590)">Ag K-&alpha;</button>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label for="detDistance">Sample-to-Detector Distance (D) <span class="value-badge" id="distVal">100 mm</span></label>
+                <input type="range" id="detDistance" min="50" max="200" step="1" value="100">
+            </div>
+
+            <div class="panel-title" style="margin-top:0.5rem;">Unit Cell Geometry</div>
+            <div class="unit-cell-box">
+                <div class="overlay-text">🖱️ Drag to Rotate 3D</div>
+                <canvas id="unitCellCanvas"></canvas>
+            </div>
+        </div>
+
+        <!-- Middle: Visual Setup Panels -->
+        <div class="middle-column">
+            <!-- Diagram Panel -->
+            <div class="panel" style="flex: 1;">
+                <div class="panel-title">Instrument Setup Schematic</div>
+                <div class="canvas-container" style="height: 100%; min-height: 200px;">
+                    <canvas id="setupCanvas"></canvas>
+                </div>
+            </div>
+            
+            <!-- Miller Indices Visualizer Panel -->
+            <div class="panel" style="flex: 1.5;">
+                <div class="panel-title">
+                    Interactive 3D Miller Indices
+                    <select id="millerPlaneSelect" style="width: auto; padding: 0.2rem 0.5rem; font-size: 0.85rem;">
+                        <option value="100">(1 0 0) Plane</option>
+                        <option value="110">(1 1 0) Plane</option>
+                        <option value="111">(1 1 1) Plane</option>
+                    </select>
+                </div>
+                <div class="canvas-container" style="height: 100%; min-height: 320px;">
+                    <div class="overlay-text">🖱️ Click & Drag to Rotate 3D Model</div>
+                    <canvas id="millerCanvas"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: 2D Detector Pattern Panel -->
+        <div class="panel">
+            <div class="panel-title">
+                2D Detector Area Pattern
+                <span style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">Debye-Scherrer Pattern</span>
+            </div>
+            <div class="canvas-container" style="height: 320px;">
+                <canvas id="detectorCanvas" width="380" height="320"></canvas>
+            </div>
+
+            <div class="panel-title" style="font-size:0.95rem;">Diffraction Reflections</div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>(hkl)</th>
+                            <th>d (&Aring;)</th>
+                            <th>2&theta; (&deg;)</th>
+                            <th>Radius (mm)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="reflectionsTable">
+                        <!-- Dynamic content -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Underlying Theory Modal -->
+    <div class="modal-overlay" id="theoryModal">
+        <div class="modal-content">
+            <button class="close-btn" id="closeTheoryBtn">&times;</button>
+            <h2>Underlying Theory: X-Ray Diffraction (XRD)</h2>
+
+            <h3>1. Purpose of X-Ray Diffraction</h3>
+            <p>X-Ray Diffraction (XRD) is a primary analytical technique used to determine the atomic structure, crystallographic phase, and lattice dimensions of crystalline materials. Because the wavelength of X-rays is on the same order of magnitude as atomic spacing (~0.1 nm / 1 Å), crystalline lattices act as three-dimensional diffraction gratings for X-rays.</p>
+
+            <h3>2. Fundamental Physics: Bragg's Law</h3>
+            <p>When monochromatic X-rays strike a crystalline lattice, secondary waves scattered from adjacent parallel crystal planes constructively interfere when the path length difference is an integer multiple of the X-ray wavelength. This condition is governed by <strong>Bragg's Law</strong>:</p>
+
+            <div class="formula-box">
+                $$ n \lambda = 2 d_{hkl} \sin(\theta) $$
+            </div>
+            <ul>
+                <li><strong>$n$</strong>: Order of diffraction (typically $n = 1$).</li>
+                <li><strong>$\lambda$</strong>: Incident X-ray wavelength (nm or Å).</li>
+                <li><strong>$d_{hkl}$</strong>: Interplanar spacing between crystallographic planes $(hkl)$.</li>
+                <li><strong>$\theta$</strong>: Scattering angle (Bragg angle). The total deflection of the beam is <strong>$2\theta$</strong>.</li>
+            </ul>
+
+            <h3>3. Miller Indices $(hkl)$ & Crystallographic Planes</h3>
+            <p>Miller indices $(h, k, l)$ are a vector-based notation system used to describe the orientation of planes within a crystal lattice. Think of these planes as the atomic "mirrors" reflecting the X-rays.</p>
+            <p>To determine the Miller indices of a plane, you find where the plane intercepts the primary crystallographic axes $(x, y, z)$, take the reciprocals of those intercepts, and clear any fractions. For example:</p>
+            <ul>
+                <li>If a plane cuts through the $x$-axis at $1$, but runs parallel to the $y$ and $z$ axes (meaning it intercepts them at infinity, $\infty$), its reciprocals are $(\frac{1}{1}, \frac{1}{\infty}, \frac{1}{\infty})$. This reduces to the <strong>$(100)$ plane</strong>.</li>
+                <li>If a plane cuts $x$ at $1$ and $y$ at $1$, but runs parallel to $z$, its reciprocals are $(\frac{1}{1}, \frac{1}{1}, \frac{1}{\infty})$. This is the <strong>$(110)$ plane</strong>.</li>
+            </ul>
+
+            <h3>4. Interplanar Spacing for Cubic Crystals</h3>
+            <p>For cubic crystals (where unit cell edge lengths $a = b = c$), the spacing $d$ between parallel planes designated by Miller indices $(h, k, l)$ is directly related to the lattice parameter $a$:</p>
+
+            <div class="formula-box">
+                $$ d_{hkl} = \frac{a}{\sqrt{h^2 + k^2 + l^2}} $$
+            </div>
+
+            <h3>5. Structure Factor & Selection Rules</h3>
+            <p>Not all lattice planes produce observable diffraction reflections. Destructive interference from interior atoms causes systematic absences depending on the cubic crystal lattice symmetry (governed by the Structure Factor $F_{hkl}$):</p>
+            <ul>
+                <li><strong>Primitive Cubic (SC):</strong> All reflections allowed except where $h^2+k^2+l^2$ cannot be expressed as sum of 3 squares (e.g., 7, 15).</li>
+                <li><strong>Body-Centered Cubic (BCC):</strong> Reflection allowed only when $(h + k + l)$ is an <strong>EVEN</strong> integer.</li>
+                <li><strong>Face-Centered Cubic (FCC):</strong> Reflection allowed only when $h, k, l$ are <strong>ALL EVEN</strong> or <strong>ALL ODD</strong> (unmixed).</li>
+            </ul>
+
+            <h3>6. Powder Diffraction & 2D Area Detector Pattern</h3>
+            <p>In a powder sample consisting of millions of randomly oriented micro-crystallites, each set of planes $(hkl)$ forms a forward-scattered <strong>diffraction cone</strong> with a semi-angle of $2\theta$. When these cones intersect a flat 2D area detector located at distance $D$, they form concentric circular rings (Debye-Scherrer rings) with radius $R$:</p>
+
+            <div class="formula-box">
+                $$ R = D \cdot \tan(2\theta) $$
+            </div>
+            <p>By measuring ring radii $R$, scientists compute scattering angles $2\theta$, calculate interplanar spacings $d_{hkl}$, and decipher both the lattice constant $a$ and crystal structure type.</p>
+        </div>
+    </div>
+
+    <script>
+        // State Variables
+        const state = {
+            type: 'FCC',
+            a: 0.361, // lattice parameter in nm
+            lambda: 0.154, // wavelength in nm
+            D: 100, // detector distance in mm
+            millerPlane: '100', // default miller plane view
+            
+            // 3D Rotation state for the Miller visualizer
+            rotX: 0.45, 
+            rotY: -0.6,
+
+            // 3D Rotation state for the Unit Cell visualizer
+            ucRotX: 0.45,
+            ucRotY: -0.6
+        };
+
+        // DOM Elements
+        const crystalTypeSelect = document.getElementById('crystalType');
+        const latticeSlider = document.getElementById('latticeConst');
+        const wavelengthSlider = document.getElementById('wavelength');
+        const distanceSlider = document.getElementById('detDistance');
+        const millerPlaneSelect = document.getElementById('millerPlaneSelect');
+
+        const latticeVal = document.getElementById('latticeVal');
+        const waveVal = document.getElementById('waveVal');
+        const distVal = document.getElementById('distVal');
+
+        const reflectionsTable = document.getElementById('reflectionsTable');
+        const theoryModal = document.getElementById('theoryModal');
+        const openTheoryBtn = document.getElementById('openTheoryBtn');
+        const closeTheoryBtn = document.getElementById('closeTheoryBtn');
+
+        // Canvases
+        const setupCanvas = document.getElementById('setupCanvas');
+        const detectorCanvas = document.getElementById('detectorCanvas');
+        const unitCellCanvas = document.getElementById('unitCellCanvas');
+        const millerCanvas = document.getElementById('millerCanvas');
+
+        const setupCtx = setupCanvas.getContext('2d');
+        const detCtx = detectorCanvas.getContext('2d');
+        const ucCtx = unitCellCanvas.getContext('2d');
+        const millerCtx = millerCanvas.getContext('2d');
+
+        // Initial setup
+        window.addEventListener('load', () => {
+            resizeCanvases();
+            updateSimulation();
+        });
+
+        window.addEventListener('resize', () => {
+            resizeCanvases();
+            updateSimulation();
+        });
+
+        function resizeCanvases() {
+            const resize = (canvas) => {
+                const container = canvas.parentElement;
+                canvas.width = container.clientWidth;
+                canvas.height = container.clientHeight;
+            };
+            resize(setupCanvas);
+            resize(unitCellCanvas);
+            resize(millerCanvas);
+        }
+
+        // --- Generic 3D Canvas Drag/Rotate Setup ---
+        function setup3DDrag(canvas, rotXKey, rotYKey, renderFn) {
+            let isDragging = false;
+            let lastX = 0;
+            let lastY = 0;
+
+            const startDrag = (x, y) => {
+                isDragging = true;
+                lastX = x;
+                lastY = y;
+            };
+
+            const onDrag = (x, y) => {
+                if (!isDragging) return;
+                const dx = x - lastX;
+                const dy = y - lastY;
+                
+                state[rotYKey] += dx * 0.01;
+                state[rotXKey] += dy * 0.01;
+                
+                // Prevent vertical flipping
+                state[rotXKey] = Math.max(-Math.PI/2, Math.min(Math.PI/2, state[rotXKey]));
+
+                lastX = x;
+                lastY = y;
+                renderFn();
+            };
+
+            const endDrag = () => { isDragging = false; };
+
+            // Mouse Events
+            canvas.addEventListener('mousedown', (e) => startDrag(e.clientX, e.clientY));
+            window.addEventListener('mousemove', (e) => onDrag(e.clientX, e.clientY));
+            window.addEventListener('mouseup', endDrag);
+
+            // Touch Events
+            canvas.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                startDrag(e.touches[0].clientX, e.touches[0].clientY);
+            }, {passive: false});
+            window.addEventListener('touchmove', (e) => {
+                if (isDragging) e.preventDefault();
+                onDrag(e.touches[0].clientX, e.touches[0].clientY);
+            }, {passive: false});
+            window.addEventListener('touchend', endDrag);
+        }
+
+        // Initialize drag events for both 3D canvases
+        setup3DDrag(millerCanvas, 'rotX', 'rotY', renderMillerCell);
+        setup3DDrag(unitCellCanvas, 'ucRotX', 'ucRotY', renderUnitCell);
+
+        // Parameter Listeners
+        crystalTypeSelect.addEventListener('change', (e) => {
+            state.type = e.target.value;
+            updateSimulation();
+        });
+
+        latticeSlider.addEventListener('input', (e) => {
+            state.a = parseFloat(e.target.value);
+            latticeVal.textContent = state.a.toFixed(3) + ' nm';
+            updateSimulation();
+        });
+
+        wavelengthSlider.addEventListener('input', (e) => {
+            state.lambda = parseFloat(e.target.value);
+            waveVal.textContent = state.lambda.toFixed(3) + ' nm';
+            updateSimulation();
+        });
+
+        distanceSlider.addEventListener('input', (e) => {
+            state.D = parseFloat(e.target.value);
+            distVal.textContent = state.D + ' mm';
+            updateSimulation();
+        });
+        
+        millerPlaneSelect.addEventListener('change', (e) => {
+            state.millerPlane = e.target.value;
+            renderMillerCell();
+        });
+
+        openTheoryBtn.addEventListener('click', () => theoryModal.style.display = 'flex');
+        closeTheoryBtn.addEventListener('click', () => theoryModal.style.display = 'none');
+        theoryModal.addEventListener('click', (e) => {
+            if (e.target === theoryModal) theoryModal.style.display = 'none';
+        });
+
+        function setPreset(element) {
+            if (element === 'Cu') {
+                state.type = 'FCC';
+                state.a = 0.361;
+            } else if (element === 'Fe') {
+                state.type = 'BCC';
+                state.a = 0.286;
+            } else if (element === 'Po') {
+                state.type = 'SC';
+                state.a = 0.335;
+            }
+            crystalTypeSelect.value = state.type;
+            latticeSlider.value = state.a;
+            latticeVal.textContent = state.a.toFixed(3) + ' nm';
+            updateSimulation();
+        }
+
+        function setWavelength(val) {
+            state.lambda = val;
+            wavelengthSlider.value = val;
+            waveVal.textContent = val.toFixed(3) + ' nm';
+            updateSimulation();
+        }
+
+        // Reflection Calculation Logic
+        function calculateReflections() {
+            const reflections = [];
+            const N_max = 26; 
+
+            for (let h = 0; h <= 5; h++) {
+                for (let k = 0; k <= h; k++) {
+                    for (let l = 0; l <= k; l++) {
+                        if (h === 0 && k === 0 && l === 0) continue;
+
+                        const N = h*h + k*k + l*l;
+                        if (N > N_max) continue;
+
+                        // Check Selection Rules
+                        let allowed = false;
+                        if (state.type === 'SC') {
+                            allowed = ![7, 15, 23].includes(N);
+                        } else if (state.type === 'BCC') {
+                            allowed = (h + k + l) % 2 === 0;
+                        } else if (state.type === 'FCC') {
+                            const hEven = h % 2 === 0, kEven = k % 2 === 0, lEven = l % 2 === 0;
+                            allowed = (hEven && kEven && lEven) || (!hEven && !kEven && !lEven);
+                        }
+
+                        if (allowed) {
+                            if (!reflections.some(r => r.N === N)) {
+                                const d = state.a / Math.sqrt(N);
+                                const sinTheta = state.lambda / (2 * d);
+
+                                if (sinTheta <= 1.0) {
+                                    const theta = Math.asin(sinTheta);
+                                    const twoThetaRad = 2 * theta;
+                                    const twoThetaDeg = twoThetaRad * (180 / Math.PI);
+
+                                    if (twoThetaDeg < 85) {
+                                        const radiusMM = state.D * Math.tan(twoThetaRad);
+                                        reflections.push({
+                                            h, k, l, N,
+                                            d_nm: d,
+                                            d_ang: d * 10,
+                                            twoThetaDeg,
+                                            radiusMM
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            reflections.sort((a, b) => a.N - b.N);
+            return reflections;
+        }
+
+        // Render functions
+        function updateSimulation() {
+            const reflections = calculateReflections();
+            renderTable(reflections);
+            render2DDetector(reflections);
+            renderSetup(reflections);
+            renderUnitCell();
+            renderMillerCell();
+        }
+
+        function renderTable(reflections) {
+            reflectionsTable.innerHTML = '';
+            if (reflections.length === 0) {
+                reflectionsTable.innerHTML = '<tr><td colspan="4" style="text-align:center;">No reflections observed</td></tr>';
+                return;
+            }
+            reflections.forEach(r => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>(${r.h}${r.k}${r.l})</strong></td>
+                    <td>${r.d_ang.toFixed(3)}</td>
+                    <td>${r.twoThetaDeg.toFixed(2)}&deg;</td>
+                    <td>${r.radiusMM.toFixed(1)}</td>
+                `;
+                reflectionsTable.appendChild(tr);
+            });
+        }
+
+        function render2DDetector(reflections) {
+            const w = detectorCanvas.width;
+            const h = detectorCanvas.height;
+            const cx = w / 2;
+            const cy = h / 2;
+
+            detCtx.clearRect(0, 0, w, h);
+
+            detCtx.fillStyle = '#020617';
+            detCtx.fillRect(0, 0, w, h);
+
+            detCtx.strokeStyle = '#1e293b';
+            detCtx.lineWidth = 1;
+            for (let r = 30; r < w/2; r += 30) {
+                detCtx.beginPath();
+                detCtx.arc(cx, cy, r, 0, Math.PI * 2);
+                detCtx.stroke();
+            }
+
+            const scalePixelPerMM = 1.3;
+
+            reflections.forEach((r, idx) => {
+                const radiusPx = r.radiusMM * scalePixelPerMM;
+                if (radiusPx > Math.min(w, h)/2 - 10) return;
+
+                detCtx.strokeStyle = `hsla(${200 + idx * 25}, 100%, 60%, 0.8)`;
+                detCtx.lineWidth = 2.5;
+                detCtx.shadowBlur = 8;
+                detCtx.shadowColor = `hsl(${200 + idx * 25}, 100%, 60%)`;
+
+                detCtx.beginPath();
+                detCtx.arc(cx, cy, radiusPx, 0, Math.PI * 2);
+                detCtx.stroke();
+                detCtx.shadowBlur = 0;
+
+                const spotCount = Math.floor(radiusPx * 0.8);
+                detCtx.fillStyle = `hsla(${200 + idx * 25}, 100%, 80%, 0.9)`;
+                for (let i = 0; i < spotCount; i++) {
+                    const angle = (i / spotCount) * Math.PI * 2 + (idx * 0.5);
+                    const jitterR = radiusPx + (Math.sin(i * 13) * 0.8);
+                    const x = cx + jitterR * Math.cos(angle);
+                    const y = cy + jitterR * Math.sin(angle);
+
+                    detCtx.beginPath();
+                    detCtx.arc(x, y, 1.2, 0, Math.PI * 2);
+                    detCtx.fill();
+                }
+
+                detCtx.fillStyle = '#94a3b8';
+                detCtx.font = '10px sans-serif';
+                detCtx.fillText(`(${r.h}${r.k}${r.l})`, cx + 5, cy - radiusPx - 3);
+            });
+
+            detCtx.fillStyle = '#ef4444';
+            detCtx.shadowBlur = 10;
+            detCtx.shadowColor = '#ef4444';
+            detCtx.beginPath();
+            detCtx.arc(cx, cy, 5, 0, Math.PI * 2);
+            detCtx.fill();
+            detCtx.shadowBlur = 0;
+
+            detCtx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+            detCtx.beginPath();
+            detCtx.arc(cx, cy, 9, 0, Math.PI * 2);
+            detCtx.stroke();
+        }
+
+        function renderSetup(reflections) {
+            const w = setupCanvas.width;
+            const h = setupCanvas.height;
+
+            setupCtx.clearRect(0, 0, w, h);
+
+            const sourceX = w * 0.15;
+            const sourceY = h / 2;
+            const sampleX = w * 0.45;
+            const sampleY = h / 2;
+            const detectorX = w - 40;
+            const detectorY = h / 2;
+
+            // X-Ray Source
+            setupCtx.fillStyle = '#1e293b';
+            setupCtx.strokeStyle = '#38bdf8';
+            setupCtx.lineWidth = 2;
+            setupCtx.fillRect(sourceX - 35, sourceY - 25, 50, 50);
+            setupCtx.strokeRect(sourceX - 35, sourceY - 25, 50, 50);
+            setupCtx.fillStyle = '#38bdf8';
+            setupCtx.font = 'bold 11px sans-serif';
+            setupCtx.fillText('X-Ray Tube', sourceX - 42, sourceY - 33);
+
+            // Incident Beam
+            setupCtx.strokeStyle = '#38bdf8';
+            setupCtx.lineWidth = 3;
+            setupCtx.shadowBlur = 8;
+            setupCtx.shadowColor = '#38bdf8';
+            setupCtx.beginPath();
+            setupCtx.moveTo(sourceX + 15, sourceY);
+            setupCtx.lineTo(sampleX, sampleY);
+            setupCtx.stroke();
+            setupCtx.shadowBlur = 0;
+
+            drawArrowhead(setupCtx, (sourceX + sampleX) / 2, sourceY, 0);
+
+            // Sample
+            setupCtx.fillStyle = '#e2e8f0';
+            setupCtx.shadowBlur = 10;
+            setupCtx.shadowColor = '#94a3b8';
+            setupCtx.save();
+            setupCtx.translate(sampleX, sampleY);
+            setupCtx.rotate(Math.PI / 6);
+            setupCtx.fillRect(-15, -15, 30, 30);
+            setupCtx.restore();
+            setupCtx.shadowBlur = 0;
+            setupCtx.fillStyle = '#f8fafc';
+            setupCtx.font = 'bold 11px sans-serif';
+            setupCtx.fillText('Sample', sampleX - 20, sampleY + 38);
+
+            // Detector
+            setupCtx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+            setupCtx.strokeStyle = '#64748b';
+            setupCtx.lineWidth = 2;
+            const detH = 140;
+            const detW = 20;
+            setupCtx.beginPath();
+            setupCtx.ellipse(detectorX, detectorY, detW / 2, detH / 2, 0, 0, Math.PI * 2);
+            setupCtx.fill();
+            setupCtx.stroke();
+            setupCtx.fillStyle = '#94a3b8';
+            setupCtx.fillText('Detector', detectorX - 22, detectorY - (detH / 2) - 10);
+
+            // Diffracted Cones
+            const scalePixelPerMM = 1.0;
+            reflections.slice(0, 4).forEach((r, idx) => {
+                const radiusPx = Math.min(r.radiusMM * scalePixelPerMM, detH / 2 - 5);
+                setupCtx.strokeStyle = `hsla(${200 + idx * 25}, 100%, 60%, 0.6)`;
+                setupCtx.lineWidth = 1.5;
+                setupCtx.setLineDash([4, 4]);
+
+                setupCtx.beginPath();
+                setupCtx.moveTo(sampleX, sampleY);
+                setupCtx.lineTo(detectorX, detectorY - radiusPx);
+                setupCtx.stroke();
+
+                setupCtx.beginPath();
+                setupCtx.moveTo(sampleX, sampleY);
+                setupCtx.lineTo(detectorX, detectorY + radiusPx);
+                setupCtx.stroke();
+                setupCtx.setLineDash([]);
+
+                setupCtx.strokeStyle = `hsla(${200 + idx * 25}, 100%, 60%, 0.9)`;
+                setupCtx.beginPath();
+                setupCtx.ellipse(detectorX, detectorY, detW / 2 * (radiusPx / (detH/2)), radiusPx, 0, 0, Math.PI * 2);
+                setupCtx.stroke();
+            });
+
+            // Direct Beam
+            setupCtx.strokeStyle = 'rgba(56, 189, 248, 0.4)';
+            setupCtx.setLineDash([2, 2]);
+            setupCtx.beginPath();
+            setupCtx.moveTo(sampleX, sampleY);
+            setupCtx.lineTo(detectorX, detectorY);
+            setupCtx.stroke();
+            setupCtx.setLineDash([]);
+        }
+
+        function drawArrowhead(ctx, x, y, angle) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(angle);
+            ctx.fillStyle = '#38bdf8';
+            ctx.beginPath();
+            ctx.moveTo(-6, -4);
+            ctx.lineTo(4, 0);
+            ctx.lineTo(-6, 4);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+        }
+
+        // --- Interactive 3D Unit Cell (Top Left) ---
+        function renderUnitCell() {
+            const w = unitCellCanvas.width;
+            const h = unitCellCanvas.height;
+            ucCtx.clearRect(0, 0, w, h);
+
+            const SCALE = 70; // Smaller scale for the left panel
+            const originX = w / 2;
+            const originY = h / 2 + 5;
+
+            // 3D projection function for the Unit Cell using its specific rotation state
+            const project3D = (x, y, z) => {
+                let cx = x - 0.5;
+                let cy = y - 0.5;
+                let cz = z - 0.5;
+
+                // Rotate around Y axis
+                let x1 = cx * Math.cos(state.ucRotY) - cz * Math.sin(state.ucRotY);
+                let z1 = cx * Math.sin(state.ucRotY) + cz * Math.cos(state.ucRotY);
+
+                // Rotate around X axis
+                let y1 = cy * Math.cos(state.ucRotX) - z1 * Math.sin(state.ucRotX);
+                let z2 = cy * Math.sin(state.ucRotX) + z1 * Math.cos(state.ucRotX);
+
+                return {
+                    px: originX + x1 * SCALE,
+                    py: originY + y1 * SCALE,
+                    depth: z2
+                };
+            };
+
+            const corners = [
+                [0,0,0], [1,0,0], [1,1,0], [0,1,0],
+                [0,0,1], [1,0,1], [1,1,1], [0,1,1]
+            ];
+
+            const edges = [
+                [0,1], [1,2], [2,3], [3,0],
+                [4,5], [5,6], [6,7], [7,4],
+                [0,4], [1,5], [2,6], [3,7]
+            ];
+
+            // Draw underlying lattice frame
+            ucCtx.strokeStyle = 'rgba(71, 85, 105, 0.8)';
+            ucCtx.lineWidth = 1.5;
+            edges.forEach(edge => {
+                const p1 = project3D(...corners[edge[0]]);
+                const p2 = project3D(...corners[edge[1]]);
+                ucCtx.beginPath();
+                ucCtx.moveTo(p1.px, p1.py);
+                ucCtx.lineTo(p2.px, p2.py);
+                ucCtx.stroke();
+            });
+
+            // Setup Atoms for rendering
+            const atomsToDraw = [];
+            const atoms = [...corners];
+            
+            if (state.type === 'BCC') {
+                atoms.push([0.5, 0.5, 0.5]);
+            } else if (state.type === 'FCC') {
+                atoms.push(
+                    [0.5, 0.5, 0], [0.5, 0.5, 1],
+                    [0.5, 0, 0.5], [0.5, 1, 0.5],
+                    [0, 0.5, 0.5], [1, 0.5, 0.5]
+                );
+            }
+
+            atoms.forEach(a => {
+                const p = project3D(...a);
+                const isExtra = a.some(coord => coord === 0.5);
+                atomsToDraw.push({ p: p, isExtra: isExtra, depth: p.depth });
+            });
+
+            // Sort atoms by depth (Painter's Algorithm)
+            atomsToDraw.sort((a, b) => b.depth - a.depth);
+
+            atomsToDraw.forEach(item => {
+                const px = item.p.px;
+                const py = item.p.py;
+                const r = 5.5 + (item.p.depth * 2); // Dynamic sizing for perspective
+
+                const grad = ucCtx.createRadialGradient(px - r*0.3, py - r*0.3, r*0.1, px, py, r);
+                if (item.isExtra) {
+                    grad.addColorStop(0, '#fb7185');
+                    grad.addColorStop(1, '#9f1239');
+                } else {
+                    grad.addColorStop(0, '#7dd3fc');
+                    grad.addColorStop(1, '#0369a1');
+                }
+
+                ucCtx.fillStyle = grad;
+                ucCtx.beginPath();
+                ucCtx.arc(px, py, Math.max(2, r), 0, Math.PI * 2);
+                ucCtx.fill();
+                
+                ucCtx.strokeStyle = '#020617';
+                ucCtx.lineWidth = 1;
+                ucCtx.stroke();
+            });
+        }
+
+        // --- Interactive 3D Miller Cell Visualization Logic ---
+        function renderMillerCell() {
+            const w = millerCanvas.width;
+            const h = millerCanvas.height;
+            millerCtx.clearRect(0, 0, w, h);
+
+            // Larger scale for clarity
+            const SCALE = 130; 
+            const originX = w / 2;
+            const originY = h / 2 + 10;
+
+            // True 3D projection function based on rotation state
+            const project3D = (x, y, z) => {
+                // Shift coordinates so rotation is around the cube's center (0.5, 0.5, 0.5)
+                let cx = x - 0.5;
+                let cy = y - 0.5;
+                let cz = z - 0.5;
+
+                // Rotate around Y axis
+                let x1 = cx * Math.cos(state.rotY) - cz * Math.sin(state.rotY);
+                let z1 = cx * Math.sin(state.rotY) + cz * Math.cos(state.rotY);
+
+                // Rotate around X axis
+                let y1 = cy * Math.cos(state.rotX) - z1 * Math.sin(state.rotX);
+                let z2 = cy * Math.sin(state.rotX) + z1 * Math.cos(state.rotX);
+
+                return {
+                    px: originX + x1 * SCALE,
+                    py: originY + y1 * SCALE,
+                    depth: z2 // Used to sort elements back-to-front
+                };
+            };
+
+            // 1. Draw Axis Lines First (Behind everything)
+            const drawAxis = (x, y, z, color, label) => {
+                const start = project3D(0, 0, 0);
+                const end = project3D(x, y, z);
+                
+                millerCtx.strokeStyle = color;
+                millerCtx.lineWidth = 2.5;
+                millerCtx.beginPath();
+                millerCtx.moveTo(start.px, start.py);
+                millerCtx.lineTo(end.px, end.py);
+                millerCtx.stroke();
+                
+                millerCtx.fillStyle = color;
+                millerCtx.font = "bold 14px sans-serif";
+                millerCtx.fillText(label, end.px + (x ? 8 : -4), end.py + (y ? 15 : -5));
+            };
+            
+            drawAxis(1.5, 0, 0, '#ef4444', 'x'); // Red X
+            drawAxis(0, 1.5, 0, '#22c55e', 'y'); // Green Y
+            drawAxis(0, 0, 1.5, '#3b82f6', 'z'); // Blue Z
+
+            // Cube Corners and Edges
+            const corners = [
+                [0,0,0], [1,0,0], [1,1,0], [0,1,0],
+                [0,0,1], [1,0,1], [1,1,1], [0,1,1]
+            ];
+            const edges = [
+                [0,1], [1,2], [2,3], [3,0],
+                [4,5], [5,6], [6,7], [7,4],
+                [0,4], [1,5], [2,6], [3,7]
+            ];
+
+            // Draw underlying lattice frame
+            millerCtx.strokeStyle = 'rgba(71, 85, 105, 0.7)'; // subtle borders
+            millerCtx.lineWidth = 1.5;
+            edges.forEach(edge => {
+                const p1 = project3D(...corners[edge[0]]);
+                const p2 = project3D(...corners[edge[1]]);
+                millerCtx.beginPath();
+                millerCtx.moveTo(p1.px, p1.py);
+                millerCtx.lineTo(p2.px, p2.py);
+                millerCtx.stroke();
+            });
+
+            // Gather all items (atoms + planes) for Z-depth sorting to render correctly
+            const drawables = [];
+
+            // Define Plane Vertices
+            let planeVertices = [];
+            if (state.millerPlane === '100') {
+                planeVertices = [[1,0,0], [1,1,0], [1,1,1], [1,0,1]];
+            } else if (state.millerPlane === '110') {
+                planeVertices = [[1,0,0], [0,1,0], [0,1,1], [1,0,1]];
+            } else if (state.millerPlane === '111') {
+                planeVertices = [[1,0,0], [0,1,0], [0,0,1]];
+            }
+            
+            // Project plane vertices and calculate average depth
+            let projectedPlane = planeVertices.map(v => project3D(...v));
+            let planeDepth = projectedPlane.reduce((sum, v) => sum + v.depth, 0) / projectedPlane.length;
+            
+            drawables.push({ type: 'plane', pts: projectedPlane, depth: planeDepth });
+
+            // Generate Atoms
+            const atoms = [...corners];
+            if (state.type === 'BCC') atoms.push([0.5, 0.5, 0.5]);
+            if (state.type === 'FCC') {
+                atoms.push(
+                    [0.5, 0.5, 0], [0.5, 0.5, 1],
+                    [0.5, 0, 0.5], [0.5, 1, 0.5],
+                    [0, 0.5, 0.5], [1, 0.5, 0.5]
+                );
+            }
+            
+            atoms.forEach(a => {
+                const p = project3D(...a);
+                const isExtra = a.some(coord => coord === 0.5);
+                drawables.push({ type: 'atom', p: p, isExtra: isExtra, depth: p.depth });
+            });
+
+            // Sort everything by depth (Painters Algorithm: draw furthest back to furthest front)
+            drawables.sort((a, b) => b.depth - a.depth);
+
+            // Execute drawables in order
+            drawables.forEach(item => {
+                if (item.type === 'atom') {
+                    const px = item.p.px;
+                    const py = item.p.py;
+                    // Scale atom size slightly by depth for 3D perspective effect
+                    const r = 8 + (item.p.depth * 3); 
+
+                    const grad = millerCtx.createRadialGradient(px - r*0.3, py - r*0.3, r*0.1, px, py, r);
+                    if (item.isExtra) {
+                        grad.addColorStop(0, '#fb7185');
+                        grad.addColorStop(1, '#9f1239');
+                    } else {
+                        grad.addColorStop(0, '#7dd3fc');
+                        grad.addColorStop(1, '#0369a1');
+                    }
+
+                    millerCtx.fillStyle = grad;
+                    millerCtx.beginPath();
+                    millerCtx.arc(px, py, Math.max(2, r), 0, Math.PI * 2);
+                    millerCtx.fill();
+                    
+                    millerCtx.strokeStyle = '#020617';
+                    millerCtx.lineWidth = 1;
+                    millerCtx.stroke();
+                    
+                } else if (item.type === 'plane') {
+                    // Draw the crystallographic plane
+                    millerCtx.fillStyle = 'rgba(56, 189, 248, 0.45)';
+                    millerCtx.strokeStyle = 'rgba(56, 189, 248, 0.9)';
+                    millerCtx.lineWidth = 2;
+                    
+                    millerCtx.beginPath();
+                    item.pts.forEach((v, i) => {
+                        if (i === 0) millerCtx.moveTo(v.px, v.py);
+                        else millerCtx.lineTo(v.px, v.py);
+                    });
+                    millerCtx.closePath();
+                    
+                    // Add a slight glow
+                    millerCtx.shadowBlur = 10;
+                    millerCtx.shadowColor = '#38bdf8';
+                    millerCtx.fill();
+                    millerCtx.shadowBlur = 0;
+                    millerCtx.stroke();
+                }
+            });
+        }
+    </script>
+</body>
+</html>
