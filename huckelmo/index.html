@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Molecular Orbital Theory in Extended Pi Electron Systems</title>
+    <script src="https://unpkg.com/3d-force-graph"></script>
+    <style>
+        :root {
+            --primary: #1e293b;
+            --secondary: #3b82f6;
+            --secondary-hover: #2563eb;
+            --accent: #ef4444;
+            --accent-hover: #dc2626;
+            --bg-light: #f8fafc;
+            --panel-bg: #ffffff;
+            --border: #e2e8f0;
+            --text-dark: #334155;
+            --text-light: #64748b;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-light);
+            color: var(--text-dark);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        header {
+            background-color: var(--primary);
+            color: white;
+            padding: 1.5rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 { margin: 0; font-size: 1.5rem; font-weight: 600; }
+
+        button {
+            background-color: var(--secondary);
+            color: white;
+            border: none;
+            padding: 0.6rem 1.2rem;
+            font-size: 0.95rem;
+            font-weight: 500;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+        }
+
+        button:hover { background-color: var(--secondary-hover); }
+        
+        button.action-btn { background-color: var(--accent); box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3); }
+        button.action-btn:hover { background-color: var(--accent-hover); }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 1.5rem;
+            padding: 1.5rem;
+            flex-grow: 1;
+            max-width: 1600px;
+            margin: 0 auto;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .panel {
+            background: var(--panel-bg);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
+            display: flex;
+            flex-direction: column;
+            border: 1px solid var(--border);
+        }
+
+        .panel-header {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-top: 0;
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 2px solid var(--bg-light);
+            color: var(--primary);
+        }
+
+        .controls-row {
+            display: flex;
+            gap: 1.5rem;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .input-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 500;
+        }
+        
+        input[type="number"] {
+            width: 60px;
+            padding: 0.4rem;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 1rem;
+            text-align: center;
+        }
+
+        .matrix-wrapper {
+            overflow-x: auto;
+            display: flex;
+            justify-content: center;
+            margin: 1rem 0;
+        }
+
+        table.interactive-matrix {
+            border-collapse: collapse;
+            font-family: monospace;
+            font-size: 1.1rem;
+        }
+
+        table.interactive-matrix th, table.interactive-matrix td {
+            width: 40px;
+            height: 40px;
+            text-align: center;
+            vertical-align: middle;
+            border: 1px solid var(--border);
+        }
+
+        table.interactive-matrix th { background-color: var(--bg-light); color: var(--text-light); }
+        
+        table.interactive-matrix td.clickable {
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        table.interactive-matrix td.clickable:hover { background-color: #e0f2fe; }
+        table.interactive-matrix td.diagonal { background-color: #f1f5f9; color: #cbd5e1; cursor: not-allowed; }
+        table.interactive-matrix td.active { background-color: #bfdbfe; color: var(--secondary-hover); font-weight: bold; }
+
+        table.math-matrix {
+            border-left: 2px solid var(--primary);
+            border-right: 2px solid var(--primary);
+            border-collapse: collapse;
+            margin: 0 auto;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        table.math-matrix td { padding: 0.4rem 0.8rem; text-align: center; }
+
+        #graph-container {
+            width: 100%;
+            height: 400px;
+            background-color: #0f172a;
+            border-radius: 8px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            cursor: grab;
+        }
+        #graph-container:active { cursor: grabbing; }
+
+        #energy-diagram {
+            display: flex;
+            flex-direction: column-reverse; /* Render lowest energy (highest index) at bottom */
+            align-items: center;
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+            flex-grow: 1;
+            padding: 1rem;
+            background-color: var(--bg-light);
+            border-radius: 8px;
+            overflow-y: auto;
+        }
+
+        .energy-row {
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            gap: 2rem;
+            width: 100%;
+        }
+        
+        .energy-level {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            padding: 0.8rem;
+            border-radius: 8px;
+            transition: all 0.2s;
+            background-color: white;
+            border: 2px solid transparent;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .energy-level:hover { border-color: var(--border); transform: translateY(-2px); }
+        .energy-level.active { border-color: var(--secondary); background-color: #eff6ff; }
+        
+        .energy-line {
+            width: 60px;
+            border-bottom: 3px solid var(--primary);
+            text-align: center;
+            margin-top: 0.5rem;
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: var(--accent);
+            line-height: 0.4;
+            height: 25px;
+        }
+        
+        .energy-label { font-size: 0.85rem; text-align: center; font-weight: 500; color: var(--text-dark); margin-bottom: 0.2rem; }
+        
+        .eigenvector-box {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background: var(--bg-light);
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            font-family: monospace;
+            overflow-x: auto;
+        }
+
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5); display: none;
+            justify-content: center; align-items: center; z-index: 1000;
+        }
+        .modal-box {
+            background: white; padding: 2.5rem; border-radius: 12px;
+            max-width: 600px; max-height: 80vh; overflow-y: auto;
+            text-align: left; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2);
+            position: relative;
+        }
+        .modal-box h3 { margin-top: 0; color: var(--primary); font-size: 1.4rem; border-bottom: 2px solid var(--border); padding-bottom: 0.5rem; }
+        .modal-box p, .modal-box ul { color: var(--text-dark); line-height: 1.6; }
+        .close-modal-btn {
+            background: var(--secondary); color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; margin-top: 1rem; float: right;
+        }
+        .info-text { font-size: 0.9rem; color: var(--text-light); margin-bottom: 1rem; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Molecular Orbital Theory in Extended Pi Electron Systems</h1>
+    <button onclick="document.getElementById('theory-modal').style.display = 'flex'">Underlying Theory</button>
+</header>
+
+<div class="main-grid">
+    <!-- Panel 1: Matrix Input -->
+    <div class="panel">
+        <h2 class="panel-header">1. Connectivity Matrix Input</h2>
+        <p class="info-text">Specify the number of atoms, then click the matrix cells to toggle bonds (0 or 1). Max coordination is 3 bonds per atom to simulate planar geometries.</p>
+        
+        <div class="controls-row">
+            <div class="input-group">
+                <label for="num-atoms">Atoms (n):</label>
+                <input type="number" id="num-atoms" value="4" min="2" max="10" onchange="initMatrix()">
+            </div>
+            <div class="input-group">
+                <label for="charge">Charge:</label>
+                <input type="number" id="charge" value="0" min="-5" max="5" onchange="calculateMOs()">
+            </div>
+            <button class="action-btn" onclick="calculateMOs()">Calculate MOs</button>
+        </div>
+
+        <div class="matrix-wrapper" id="interactive-matrix-container"></div>
+    </div>
+
+    <!-- Panel 2: 3D Visualization -->
+    <div class="panel">
+        <h2 class="panel-header">2. 3D Cluster Visualization</h2>
+        <p class="info-text">Drag to rotate the molecule. Click an MO in the energy diagram to visualize the wavefunction phase (Red = +, Blue = -) and amplitude (Node size).</p>
+        <div id="graph-container"></div>
+    </div>
+
+    <!-- Panel 3: Math Formulation -->
+    <div class="panel">
+        <h2 class="panel-header">3. Mathematical Formulation</h2>
+        <p class="info-text">Matrices and Characteristic Polynomial are dynamically constructed from the connectivity.</p>
+        <div style="display: flex; flex-direction: column; gap: 1.5rem; align-items: center;" id="math-display">
+            <p style="color: var(--text-light); font-style: italic;">Adjust the matrix to view the formulation.</p>
+        </div>
+    </div>
+
+    <!-- Panel 4: Energy Diagram -->
+    <div class="panel">
+        <h2 class="panel-header">4. Energy Diagram & Eigenvectors</h2>
+        <p class="info-text">Energies group by degeneracy and obey Hund's Rule. Click a level to view LCAO coefficients and project them onto the 3D model.</p>
+        
+        <div id="energy-diagram">
+            <p style="color: var(--text-light); font-style: italic;">Click 'Calculate MOs' to populate.</p>
+        </div>
+        
+        <div id="eigenvector-display" class="eigenvector-box" style="display: none;"></div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="message-modal">
+    <div class="modal-box" style="text-align: center; max-width: 400px;">
+        <h3 style="color: var(--accent); border: none;" id="modal-title">Notice</h3>
+        <p id="modal-text">Message goes here.</p>
+        <button class="close-modal-btn" style="float: none;" onclick="closeMessageModal()">Understood</button>
+    </div>
+</div>
+
+<div class="modal-overlay" id="theory-modal">
+    <div class="modal-box">
+        <h3>Underlying Theory & Functionality</h3>
+        <p><b>Purpose:</b> This application bridges the qualitative understanding of MO theory with the rigorous linear algebra methods of the Hückel approach.</p>
+        <p><b>Workflow & Features:</b></p>
+        <ul>
+            <li><b>Matrix Building:</b> Construct a molecular topology directly via the adjacency matrix. The system automatically enforces symmetry (if atom 1 is bonded to 2, atom 2 is bonded to 1) and validates maximum 3-coordination for planar realism.</li>
+            <li><b>Math & Secular Determinants:</b> Generates the |H - ES| = 0 determinant, assuming standard Hückel approximations (α for diagonal, β for adjacent neighbors, S=I). Evaluates the characteristic polynomial using the Faddeev-LeVerrier algorithm.</li>
+            <li><b>Jacobi Diagonalization:</b> Iteratively calculates eigenvalues (energy states: E = α + xβ) and eigenvectors (LCAO coefficients).</li>
+            <li><b>Degeneracies & Hund's Rule:</b> The energy diagram strictly aligns degenerate states (difference < 0.001) horizontally. Electrons follow the Aufbau principle, filling the lowest energy first, and Hund's Rule, maximizing spin multiplicity for degenerate sets by placing one electron in each orbital before pairing.</li>
+            <li><b>3D Wavefunction Projection:</b> Clicking an MO maps its eigenvector to the 3D topology. Node size reflects amplitude (|c| scaled), and color indicates phase sign (Red = positive phase, Blue = negative phase), visualizing nodal planes.</li>
+        </ul>
+        <button class="close-modal-btn" onclick="document.getElementById('theory-modal').style.display = 'none'">Close</button>
+    </div>
+</div>
+
+<script>
+    let numAtoms = 4;
+    let adjMatrix = [];
+    let graph3d = null;
+    let selectedMO = null;
+    let degenerateGroups = [];
+
+    // Initialize the app on load
+    document.addEventListener("DOMContentLoaded", () => {
+        init3DGraph();
+        initMatrix();
+    });
+
+    // Custom alert replacement
+    function showMessageModal(title, msg) {
+        document.getElementById('modal-title').innerText = title;
+        document.getElementById('modal-text').innerText = msg;
+        document.getElementById('message-modal').style.display = 'flex';
+    }
+    
+    function closeMessageModal() {
+        document.getElementById('message-modal').style.display = 'none';
+    }
+
+    function init3DGraph() {
+        const container = document.getElementById('graph-container');
+        graph3d = ForceGraph3D()(container)
+            .backgroundColor('#0f172a')
+            .linkWidth(2)
+            .linkOpacity(0.5)
+            .linkColor(() => '#94a3b8')
+            .nodeResolution(16)
+            .nodeVal(node => {
+                // Size mapping based on eigenvector amplitude
+                if (selectedMO !== null && degenerateGroups.length > 0) {
+                    let moData = getMOData(selectedMO);
+                    if(moData) {
+                        let coeff = moData.vec[node.id - 1];
+                        let amp = Math.abs(coeff);
+                        return Math.max(0.1, amp * amp * 20); // Scale square of coeff (probability density-ish)
+                    }
+                }
+                return 3; // Default size
+            })
+            .nodeColor(node => {
+                // Color mapping based on eigenvector phase
+                if (selectedMO !== null && degenerateGroups.length > 0) {
+                    let moData = getMOData(selectedMO);
+                    if(moData) {
+                        let coeff = moData.vec[node.id - 1];
+                        if (Math.abs(coeff) < 0.001) return '#94a3b8'; // Near node (zero amplitude)
+                        return coeff > 0 ? '#ef4444' : '#3b82f6'; // Red for +, Blue for -
+                    }
+                }
+                return '#22c55e'; // Default color (green)
+            })
+            .nodeLabel(node => {
+                let label = `Atom ${node.id}`;
+                if (selectedMO !== null && degenerateGroups.length > 0) {
+                    let moData = getMOData(selectedMO);
+                    if(moData) {
+                        let coeff = moData.vec[node.id - 1];
+                        label += `<br>Coefficient: ${coeff.toFixed(4)}`;
+                    }
+                }
+                return label;
+            })
+            .width(container.clientWidth)
+            .height(container.clientHeight);
+            
+        window.addEventListener('resize', () => {
+            if(graph3d) graph3d.width(container.clientWidth).height(container.clientHeight);
+        });
+    }
+
+    function initMatrix() {
+        let inputN = parseInt(document.getElementById('num-atoms').value);
+        if (isNaN(inputN) || inputN < 2) inputN = 2;
+        if (inputN > 10) {
+            inputN = 10;
+            showMessageModal("Limit Reached", "This simulation is limited to a maximum of 10 atoms.");
+        }
+        
+        document.getElementById('num-atoms').value = inputN;
+        
+        // Preserve old matrix data if resizing
+        let newMatrix = Array(inputN).fill().map(() => Array(inputN).fill(0));
+        let minSize = Math.min(numAtoms, inputN);
+        if (adjMatrix.length > 0) {
+            for(let i=0; i<minSize; i++) {
+                for(let j=0; j<minSize; j++) {
+                    newMatrix[i][j] = adjMatrix[i][j];
+                }
+            }
+        } else {
+            // Default: linear chain (e.g. butadiene)
+            for(let i=0; i<inputN-1; i++) {
+                newMatrix[i][i+1] = 1;
+                newMatrix[i+1][i] = 1;
+            }
+        }
+
+        numAtoms = inputN;
+        adjMatrix = newMatrix;
+        
+        clearResults();
+        renderMatrixUI();
+        update3DGraph();
+        updateMathFormulation();
+    }
+
+    function renderMatrixUI() {
+        let container = document.getElementById('interactive-matrix-container');
+        
+        let table = document.createElement('table');
+        table.className = 'interactive-matrix';
+        
+        // Header row
+        let headerRow = document.createElement('tr');
+        headerRow.appendChild(document.createElement('th')); // empty top-left
+        for(let j=0; j<numAtoms; j++) {
+            let th = document.createElement('th');
+            th.innerText = j + 1;
+            headerRow.appendChild(th);
+        }
+        table.appendChild(headerRow);
+        
+        // Data rows
+        for(let i=0; i<numAtoms; i++) {
+            let row = document.createElement('tr');
+            
+            // Row header
+            let th = document.createElement('th');
+            th.innerText = i + 1;
+            row.appendChild(th);
+            
+            // Cells
+            for(let j=0; j<numAtoms; j++) {
+                let td = document.createElement('td');
+                if (i === j) {
+                    td.className = 'diagonal';
+                    td.innerText = '0';
+                } else {
+                    let val = adjMatrix[i][j];
+                    td.className = val === 1 ? 'clickable active' : 'clickable';
+                    td.innerText = val;
+                    // Add click event securely without string injection
+                    td.onclick = () => toggleBond(i, j);
+                }
+                row.appendChild(td);
+            }
+            table.appendChild(row);
+        }
+        
+        container.innerHTML = '';
+        container.appendChild(table);
+    }
+
+    function toggleBond(i, j) {
+        let current = adjMatrix[i][j];
+        let next = current === 1 ? 0 : 1;
+        
+        if (next === 1) {
+            // Validate Coordination limits (max 3)
+            let bondsI = adjMatrix[i].reduce((a,b)=>a+b, 0);
+            let bondsJ = adjMatrix[j].reduce((a,b)=>a+b, 0);
+            if (bondsI >= 3 || bondsJ >= 3) {
+                showMessageModal('Coordination Limit Exceeded', 'Atoms in a planar sp2 hybridized system cannot have more than 3 adjacent pi-bonds in this simulation.');
+                return;
+            }
+        }
+        
+        // Enforce symmetry (undirected graph)
+        adjMatrix[i][j] = next;
+        adjMatrix[j][i] = next;
+        
+        clearResults();
+        renderMatrixUI();
+        update3DGraph();
+        updateMathFormulation();
+    }
+
+    function clearResults() {
+        selectedMO = null;
+        degenerateGroups = [];
+        document.getElementById('energy-diagram').innerHTML = "<p style='color: var(--text-light); font-style: italic;'>Click 'Calculate MOs' to populate.</p>";
+        document.getElementById('eigenvector-display').style.display = 'none';
+    }
+
+    function update3DGraph() {
+        let nodes = [];
+        let links = [];
+        
+        for(let i=0; i<numAtoms; i++) {
+            nodes.push({ id: i + 1 });
+            for(let j=i+1; j<numAtoms; j++) {
+                if (adjMatrix[i][j] === 1) {
+                    links.push({ source: i + 1, target: j + 1 });
+                }
+            }
+        }
+        
+        graph3d.graphData({ nodes, links });
+        // Trigger re-eval of node colors and sizes
+        graph3d.nodeColor(graph3d.nodeColor()); 
+        graph3d.nodeVal(graph3d.nodeVal());
+    }
+
+    function updateMathFormulation() {
+        let container = document.getElementById('math-display');
+        let html = "";
+        
+        // Determinant Matrix
+        html += "<div><b>Secular Determinant |H - ES| = 0</b><br><br><table class='math-matrix'>";
+        for(let i=0; i<numAtoms; i++) {
+            html += "<tr>";
+            for(let j=0; j<numAtoms; j++) {
+                if(i === j) html += "<td>α-E</td>";
+                else if(adjMatrix[i][j] === 1) html += "<td>β</td>";
+                else html += "<td>0</td>";
+            }
+            html += "</tr>";
+        }
+        html += "</table></div>";
+
+        // x Substitution Matrix
+        html += "<div>Let <i>x</i> = (α-E)/β &nbsp;&nbsp;&nbsp; (so E = α - xβ)<br><br><table class='math-matrix'>";
+        for(let i=0; i<numAtoms; i++) {
+            html += "<tr>";
+            for(let j=0; j<numAtoms; j++) {
+                if(i === j) html += "<td><i>x</i></td>";
+                else if(adjMatrix[i][j] === 1) html += "<td>1</td>";
+                else html += "<td>0</td>";
+            }
+            html += "</tr>";
+        }
+        html += "</table></div>";
+
+        // Polynomial (Faddeev-LeVerrier)
+        let poly = getCharacteristicPolynomial(adjMatrix);
+        html += `<div style="text-align: center; max-width: 100%; overflow-x: auto;">
+                    <b>Characteristic Polynomial:</b><br><br>
+                    <span style="font-family: monospace; font-size: 1.1rem;">${poly}</span>
+                 </div>`;
+        
+        container.innerHTML = html;
+    }
+
+    function getCharacteristicPolynomial(matrix) {
+        let n = matrix.length;
+        if (n === 0) return "";
+        let M = matrix;
+        let c = [1];
+        let Ak = Array(n).fill().map((_, i) => {
+            let row = Array(n).fill(0);
+            row[i] = 1;
+            return row;
+        });
+
+        for(let k=1; k<=n; k++) {
+            let tempA = Array(n).fill().map(() => Array(n).fill(0));
+            for(let i=0; i<n; i++) {
+                for(let j=0; j<n; j++) {
+                    for(let l=0; l<n; l++) {
+                        tempA[i][j] += M[i][l] * Ak[l][j];
+                    }
+                }
+            }
+            
+            let trace = 0;
+            for(let i=0; i<n; i++) trace += tempA[i][i];
+            
+            let ck = -trace / k;
+            c.push(ck);
+            
+            for(let i=0; i<n; i++) {
+                for(let j=0; j<n; j++) {
+                    Ak[i][j] = tempA[i][j];
+                    if (i === j) Ak[i][j] += ck;
+                }
+            }
+        }
+
+        let polyStr = "P(x) = ";
+        let hasTerms = false;
+        for(let i=0; i<=n; i++) {
+            let coeff = c[i];
+            if (Math.abs(coeff) < 1e-9) continue; // skip 0
+            
+            let power = n - i;
+            let sign = coeff > 0 ? (hasTerms ? " + " : "") : " - ";
+            let val = Math.abs(coeff);
+            
+            polyStr += sign;
+            if (val !== 1 || power === 0) polyStr += parseFloat(val.toFixed(4));
+            if (power > 0) polyStr += "x";
+            if (power > 1) polyStr += "<sup>" + power + "</sup>";
+            
+            hasTerms = true;
+        }
+        polyStr += " = 0";
+        return polyStr;
+    }
+
+    function calculateMOs() {
+        if(numAtoms === 0) return;
+        
+        // 1. Diagonalize matrix to find eigenvalues/vectors
+        let results = jacobiDiagonalize(adjMatrix);
+        
+        // 2. Sort by eigenvalue (E = α - xβ. Since β is negative, positive x means lower energy. 
+        // We will display energies as E = α + (eigenvalue)β. 
+        // Standard Hückel yields eigenvalues of the adjacency matrix. 
+        // roots of det(xI - A) = 0. Eigenvalues λ. 
+        // Energy E = α + λβ. Since β < 0, larger positive λ is more stable (lower energy).
+        // Let's sort λ descending so the largest positive λ is first (lowest energy state).
+        results.sort((a, b) => b.value - a.value);
+
+        // 3. Group Degenerate Levels
+        degenerateGroups = [];
+        for (let i = 0; i < results.length; i++) {
+            results[i].moIndex = i + 1; // 1-based MO index
+            
+            if (degenerateGroups.length > 0) {
+                let lastGroup = degenerateGroups[degenerateGroups.length - 1];
+                let energyDiff = Math.abs(lastGroup[0].value - results[i].value);
+                if (energyDiff < 0.001) {
+                    lastGroup.push(results[i]);
+                    continue;
+                }
+            }
+            degenerateGroups.push([results[i]]);
+        }
+
+        // 4. Fill Electrons (Aufbau & Hund's Rule)
+        let charge = parseInt(document.getElementById('charge').value) || 0;
+        let totalElectrons = Math.max(0, numAtoms - charge);
+        let eRemaining = totalElectrons;
+
+        degenerateGroups.forEach(group => {
+            let capacity = group.length * 2;
+            group.forEach(mo => mo.electrons = 0); 
+            
+            if (eRemaining >= capacity) {
+                // Fully fill the degenerate group
+                group.forEach(mo => mo.electrons = 2);
+                eRemaining -= capacity;
+            } else if (eRemaining > 0) {
+                // Hund's rule: place 1 in each available degenerate orbital first
+                for(let i=0; i<group.length && eRemaining > 0; i++) {
+                    group[i].electrons = 1;
+                    eRemaining--;
+                }
+                // Pair them up if any electrons remain
+                for(let i=0; i<group.length && eRemaining > 0; i++) {
+                    group[i].electrons = 2;
+                    eRemaining--;
+                }
+            }
+        });
+
+        // Default selection: HOMO or highest occupied
+        selectedMO = 1; 
+        
+        renderEnergyDiagram();
+        renderEigenvectors();
+        update3DGraph();
+    }
+
+    function jacobiDiagonalize(matrix) {
+        let n = matrix.length;
+        let A = matrix.map(row => [...row]);
+        let V = Array(n).fill().map((_, i) => {
+            let row = Array(n).fill(0);
+            row[i] = 1;
+            return row;
+        });
+
+        const maxIter = 100;
+        const eps = 1e-9;
+
+        for (let iter = 0; iter < maxIter; iter++) {
+            let maxVal = 0, p = 0, q = 0;
+            for (let i = 0; i < n; i++) {
+                for (let j = i + 1; j < n; j++) {
+                    if (Math.abs(A[i][j]) > maxVal) {
+                        maxVal = Math.abs(A[i][j]);
+                        p = i; q = j;
+                    }
+                }
+            }
+            
+            if (maxVal < eps) break;
+
+            let diff = A[q][q] - A[p][p];
+            let phi = 0;
+            if (Math.abs(diff) < eps) {
+                phi = Math.PI / 4 * Math.sign(A[p][q]);
+            } else {
+                phi = 0.5 * Math.atan(2 * A[p][q] / diff);
+            }
+
+            let c = Math.cos(phi);
+            let s = Math.sin(phi);
+
+            let app = c*c*A[p][p] - 2*s*c*A[p][q] + s*s*A[q][q];
+            let aqq = s*s*A[p][p] + 2*s*c*A[p][q] + c*c*A[q][q];
+            A[p][q] = A[q][p] = 0;
+            A[p][p] = app;
+            A[q][q] = aqq;
+
+            for (let i = 0; i < n; i++) {
+                if (i !== p && i !== q) {
+                    let api = c*A[p][i] - s*A[q][i];
+                    let aqi = s*A[p][i] + c*A[q][i];
+                    A[p][i] = A[i][p] = api;
+                    A[q][i] = A[i][q] = aqi;
+                }
+            }
+
+            for (let i = 0; i < n; i++) {
+                let vip = c*V[i][p] - s*V[i][q];
+                let viq = s*V[i][p] + c*V[i][q];
+                V[i][p] = vip;
+                V[i][q] = viq;
+            }
+        }
+
+        let results = [];
+        for(let i=0; i<n; i++) {
+            let vec = [];
+            for(let j=0; j<n; j++) vec.push(V[j][i]);
+            results.push({ value: A[i][i], vec: vec });
+        }
+        return results;
+    }
+
+    function getMOData(index) {
+        for(let group of degenerateGroups) {
+            for(let mo of group) {
+                if(mo.moIndex === index) return mo;
+            }
+        }
+        return null;
+    }
+
+    function renderEnergyDiagram() {
+        const diagDiv = document.getElementById('energy-diagram');
+        diagDiv.innerHTML = "";
+        
+        // Loop through degenerate groups (rendered reverse naturally via css column-reverse, so lowest energy at bottom)
+        for (let i = 0; i < degenerateGroups.length; i++) {
+            let group = degenerateGroups[i];
+            
+            let rowDiv = document.createElement('div');
+            rowDiv.className = 'energy-row';
+            
+            for (let j = 0; j < group.length; j++) {
+                let mo = group[j];
+                
+                let moDiv = document.createElement('div');
+                moDiv.className = 'energy-level' + (selectedMO === mo.moIndex ? ' active' : '');
+                
+                moDiv.onclick = () => {
+                    selectedMO = mo.moIndex;
+                    renderEnergyDiagram(); // update active class
+                    renderEigenvectors();
+                    update3DGraph();
+                };
+
+                let valStr = mo.value.toFixed(3);
+                let sign = mo.value >= 0 ? "+" : ""; // Display E = α + λβ
+                
+                let label = document.createElement('div');
+                label.className = 'energy-label';
+                label.innerHTML = `MO ${mo.moIndex}<br>E = α ${sign}${valStr}β`;
+
+                let line = document.createElement('div');
+                line.className = 'energy-line';
+                
+                // Draw arrows based on electron count
+                if (mo.electrons === 2) {
+                    line.innerHTML = "↿⇂";
+                } else if (mo.electrons === 1) {
+                    line.innerHTML = "↿"; // Spin up
+                } else {
+                    line.innerHTML = "&nbsp;";
+                }
+
+                moDiv.appendChild(label);
+                moDiv.appendChild(line);
+                rowDiv.appendChild(moDiv);
+            }
+            diagDiv.appendChild(rowDiv);
+        }
+    }
+
+    function renderEigenvectors() {
+        let display = document.getElementById('eigenvector-display');
+        
+        let mo = getMOData(selectedMO);
+        if (!mo) {
+            display.style.display = 'none';
+            return;
+        }
+        
+        let html = `<div style="font-weight: bold; margin-bottom: 0.5rem; color: var(--primary);">Selected MO: ${selectedMO} Coefficients</div>`;
+        html += "<div style='display: flex; gap: 1rem; flex-wrap: wrap;'>";
+        
+        for(let i=0; i<mo.vec.length; i++) {
+            let val = mo.vec[i].toFixed(4);
+            let color = mo.vec[i] > 0.001 ? "var(--accent)" : (mo.vec[i] < -0.001 ? "var(--secondary)" : "var(--text-light)");
+            html += `<span style="padding: 0.4rem 0.8rem; background: white; border: 1px solid var(--border); border-radius: 4px; display: inline-block;">
+                        C<sub>${i+1}</sub> = <span style="color: ${color}; font-weight: 500;">${val}</span>
+                     </span>`;
+        }
+        html += "</div>";
+        
+        display.innerHTML = html;
+        display.style.display = 'block';
+    }
+
+</script>
+
+</body>
+</html>
