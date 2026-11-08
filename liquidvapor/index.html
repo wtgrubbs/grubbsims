@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Liquid-Vapor Phase Equilibrium Simulation</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1e1e24;
+            color: #f8f9fa;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+            gap: 30px;
+        }
+        #simulation-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 {
+            color: #edf2f4;
+            font-size: 1.5rem;
+            margin-top: 0;
+            margin-bottom: 15px;
+            text-align: center;
+            width: 100%;
+        }
+        canvas {
+            background: linear-gradient(180deg, #2b2d42 0%, #0d1b2a 100%);
+            border: 3px solid #8d99ae;
+            border-radius: 8px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.5);
+        }
+        #controls {
+            background-color: #2b2d42;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            width: 320px;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            height: fit-content;
+        }
+        h2 { margin: 0; color: #ef233c; text-align: center; font-size: 1.2rem;}
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        label {
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: #edf2f4;
+            display: flex;
+            justify-content: space-between;
+        }
+        input[type="range"] {
+            width: 100%;
+            accent-color: #ef233c;
+        }
+        select {
+            padding: 8px;
+            border-radius: 6px;
+            background-color: #1e1e24;
+            color: #f8f9fa;
+            border: 1px solid #8d99ae;
+            font-family: inherit;
+            font-size: 0.9rem;
+            outline: none;
+            cursor: pointer;
+        }
+        select:focus { border-color: #ef233c; }
+        .buttons, .modal-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 5px;
+        }
+        button {
+            flex: 1;
+            padding: 10px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        #btn-play { background-color: #ef233c; color: white; }
+        #btn-play:hover { background-color: #d90429; }
+        #btn-reset { background-color: #8d99ae; color: white; }
+        #btn-reset:hover { background-color: #6c757d; }
+        
+        #btn-record {
+            background-color: #f77f00;
+            color: white;
+            width: 100%;
+            padding: 12px;
+            margin-top: 5px;
+        }
+        #btn-record:hover { background-color: #d62828; }
+        .recording-active {
+            background-color: #d62828 !important;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.6; }
+            100% { opacity: 1; }
+        }
+
+        .modal-btn { background-color: #00b4d8; color: white; }
+        .modal-btn:hover { background-color: #0096c7; }
+
+        /* Modal Styles */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background-color: #2b2d42;
+            padding: 30px;
+            border-radius: 12px;
+            width: 600px;
+            max-width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            position: relative;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.8);
+            border: 1px solid #8d99ae;
+        }
+        .modal-content h3 {
+            color: #ef233c;
+            margin-top: 0;
+            border-bottom: 1px solid #8d99ae;
+            padding-bottom: 10px;
+        }
+        .modal-content p, .modal-content li {
+            color: #edf2f4;
+            line-height: 1.5;
+            font-size: 0.95rem;
+        }
+        .modal-content ul {
+            padding-left: 20px;
+        }
+        .close-btn {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            font-size: 1.5rem;
+            color: #8d99ae;
+            cursor: pointer;
+            background: none;
+            border: none;
+            padding: 0;
+            width: auto;
+        }
+        .close-btn:hover { color: #ef233c; }
+    </style>
+</head>
+<body>
+
+<div id="simulation-container">
+    <h1>Liquid-Vapor Phase Equilibrium Simulation</h1>
+    <canvas id="simCanvas" width="350" height="700"></canvas>
+</div>
+
+<div id="controls">
+    <h2>System Controls</h2>
+    
+    <div class="control-group">
+        <label>Particles: <span id="val-particles">800</span></label>
+        <input type="range" id="slider-particles" min="100" max="1500" value="800" step="50">
+    </div>
+
+    <div class="control-group">
+        <label>Temperature (T): <span id="val-temp">0.45</span></label>
+        <input type="range" id="slider-temp" min="0.05" max="4.0" value="0.45" step="0.05">
+    </div>
+
+    <div class="control-group">
+        <label>Gravity (g): <span id="val-gravity">0.02</span></label>
+        <input type="range" id="slider-gravity" min="0.00" max="0.1" value="0.02" step="0.005">
+    </div>
+
+    <div class="buttons">
+        <button id="btn-play">Pause</button>
+        <button id="btn-reset">Reset System</button>
+    </div>
+
+    <hr style="border: 1px solid #8d99ae; width: 100%; margin: 5px 0;">
+
+    <div class="control-group">
+        <label>Video Capture Quality:</label>
+        <select id="video-quality">
+            <option value="standard">Standard (30 fps, 2.5 Mbps)</option>
+            <option value="high">High (60 fps, 8.0 Mbps)</option>
+            <option value="super" selected>Super High (60 fps, 50.0 Mbps)</option>
+        </select>
+        <button id="btn-record">⏺ Start Recording (.webm)</button>
+    </div>
+
+    <hr style="border: 1px solid #8d99ae; width: 100%; margin: 5px 0;">
+
+    <div class="modal-buttons">
+        <button class="modal-btn" onclick="openModal('modal-theory')">Underlying Theory</button>
+        <button class="modal-btn" onclick="openModal('modal-advice')">Advice For Using This App</button>
+    </div>
+</div>
+
+<!-- Theory Modal -->
+<div id="modal-theory" class="modal-overlay" onclick="closeOnBackground(event, 'modal-theory')">
+    <div class="modal-content">
+        <button class="close-btn" onclick="closeModal('modal-theory')">&times;</button>
+        <h3>Underlying Theory</h3>
+        <p>This application models a 2D fluid using classical molecular dynamics. Several key physical and computational principles make this simulation possible:</p>
+        <ul>
+            <li><strong>Lennard-Jones Potential:</strong> Particles interact via a 12-6 Lennard-Jones potential, creating a strong repulsive force when particles overlap and a weak attractive force at medium distances. This attraction is what allows the "liquid" phase to cohere.</li>
+            <li><strong>Spatial Partitioning (Cell Linked-List):</strong> To simulate up to 1,500 particles efficiently, the system divides the bounding box into a grid of cells based on the interaction cutoff radius. Particles only calculate forces with neighbors in their own cell and adjacent cells, reducing computational complexity from O(N²) to O(N).</li>
+            <li><strong>Barometric Gradient & Gravity:</strong> A constant downward force pulls particles toward the bottom hard wall. Without gravity, the liquid would form a floating droplet. Gravity forces sedimentation, allowing a distinct phase boundary (meniscus) to form between the dense liquid pool and the lighter vapor above it.</li>
+            <li><strong>Periodic Boundary Conditions (PBC):</strong> The left and right walls are periodic. If a particle exits the left side, it reappears on the right. This mimics an infinitely wide horizontal container and prevents wall-induced artificial crystallization on the sides.</li>
+            <li><strong>Velocity Rescaling Thermostat:</strong> The system maintains the target Temperature by continuously measuring the total kinetic energy of the particles and gently scaling their velocities up or down to match the desired thermal state.</li>
+        </ul>
+    </div>
+</div>
+
+<!-- Advice Modal -->
+<div id="modal-advice" class="modal-overlay" onclick="closeOnBackground(event, 'modal-advice')">
+    <div class="modal-content">
+        <button class="close-btn" onclick="closeModal('modal-advice')">&times;</button>
+        <h3>Advice For Using This App</h3>
+        <p>Successfully observing a phase transition requires a balance of parameters and a little patience. Here is how to get the most out of the simulation:</p>
+        <ul>
+            <li><strong>Equilibration Time is Required:</strong> When you reset or change the number of particles, they spawn in a rigid grid to prevent explosive overlapping forces. <strong>You must let the simulation run for a minute or two</strong> to allow the grid to collapse, the liquid pool to form at the bottom, and the system to reach thermal equilibrium.</li>
+            <li><strong>Finding the Phase Boundary:</strong> Set the Temperature between 0.35 and 0.55 and Gravity around 0.02. After equilibration, you should see a dense liquid layer at the bottom and a sparse vapor layer actively evaporating and condensing above it.</li>
+            <li><strong>Creating a Superheated Gas:</strong> Slowly turn the Temperature slider up to 3.0 or 4.0. The thermal kinetic energy will overpower the Lennard-Jones attraction, causing the liquid pool to completely boil off into a single-phase gas filling the container.</li>
+            <li><strong>Tuning Gravity:</strong> If gravity is too high, the gas will be artificially crushed into the liquid pool. If gravity is set to 0.0, the liquid pool will lift off the bottom wall and form a drifting, circular droplet surrounded by gas.</li>
+            <li><strong>Recording Video:</strong> Select your desired video quality, then click "Start Recording" to capture the system behavior over time. To save the file, click "Stop & Save Video" and a .webm file will automatically download to your computer.</li>
+        </ul>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('simCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    // UI Elements
+    const sParticles = document.getElementById('slider-particles');
+    const sTemp = document.getElementById('slider-temp');
+    const sGravity = document.getElementById('slider-gravity');
+    const sVideoQuality = document.getElementById('video-quality');
+    const btnPlay = document.getElementById('btn-play');
+    const btnReset = document.getElementById('btn-reset');
+    const btnRecord = document.getElementById('btn-record');
+
+    // Display Values
+    const vParticles = document.getElementById('val-particles');
+    const vTemp = document.getElementById('val-temp');
+    const vGravity = document.getElementById('val-gravity');
+
+    // Simulation Parameters
+    let N = parseInt(sParticles.value);
+    let targetTemp = parseFloat(sTemp.value);
+    let gravity = parseFloat(sGravity.value);
+    let timeStep = 0.01; 
+    
+    const sigma = 10;          
+    const epsilon = 1.0;       
+    const cutoff = 2.5 * sigma; 
+    const rcutSq = cutoff * cutoff;
+    const mass = 1.0;
+    
+    // Cell Linked-List Grid setup
+    const cellSize = cutoff;
+    const cols = Math.floor(canvas.width / cellSize);
+    const rows = Math.floor(canvas.height / cellSize);
+    let grid = new Array(cols * rows).fill(null).map(() => []);
+
+    let isRunning = true;
+    let particles = [];
+    let animationId;
+
+    // Video Recording Variables
+    let mediaRecorder;
+    let recordedChunks = [];
+    let isRecording = false;
+
+    class Particle {
+        constructor(x, y) {
+            this.x = x;
+            this.y = y;
+            this.vx = (Math.random() - 0.5) * 2.0;
+            this.vy = (Math.random() - 0.5) * 2.0;
+            this.ax = 0;
+            this.ay = 0;
+        }
+    }
+
+    function initSystem() {
+        particles = [];
+        N = parseInt(sParticles.value);
+        
+        let pCols = Math.floor(canvas.width / (sigma * 1.1));
+        let startY = canvas.height - 15;
+        let startX = sigma;
+        
+        let col = 0;
+        let row = 0;
+
+        for (let i = 0; i < N; i++) {
+            let px = startX + col * (sigma * 1.05) + (Math.random()*0.5-0.25);
+            let py = startY - row * (sigma * 1.05) + (Math.random()*0.5-0.25);
+            
+            if(py < sigma) py = sigma + Math.random()*10;
+
+            particles.push(new Particle(px, py));
+            
+            col++;
+            if (col >= pCols) {
+                col = 0;
+                row++;
+            }
+        }
+        computeForces(); 
+    }
+
+    function assignToGrid() {
+        for (let i = 0; i < grid.length; i++) {
+            grid[i].length = 0; 
+        }
+        for (let i = 0; i < N; i++) {
+            let p = particles[i];
+            let cx = Math.floor(p.x / cellSize);
+            let cy = Math.floor(p.y / cellSize);
+            
+            if (cx < 0) cx = 0;
+            if (cx >= cols) cx = cols - 1;
+            if (cy < 0) cy = 0;
+            if (cy >= rows) cy = rows - 1;
+
+            grid[cy * cols + cx].push(p);
+        }
+    }
+
+    function computeForces() {
+        for (let i = 0; i < N; i++) {
+            particles[i].ax = 0;
+            particles[i].ay = gravity; 
+        }
+
+        assignToGrid();
+
+        for (let cy = 0; cy < rows; cy++) {
+            for (let cx = 0; cx < cols; cx++) {
+                let cell = grid[cy * cols + cx];
+                
+                for (let i = 0; i < cell.length; i++) {
+                    let p1 = cell[i];
+                    for (let j = i + 1; j < cell.length; j++) {
+                        applyLJ(p1, cell[j]);
+                    }
+                }
+
+                const neighbors = [
+                    { dx: 1, dy: 0 },
+                    { dx: 1, dy: 1 },
+                    { dx: 0, dy: 1 },
+                    { dx: -1, dy: 1 }
+                ];
+
+                for (let n of neighbors) {
+                    let nx = cx + n.dx;
+                    let ny = cy + n.dy;
+
+                    if (nx < 0) nx += cols;
+                    else if (nx >= cols) nx -= cols;
+
+                    if (ny >= 0 && ny < rows) {
+                        let neighborCell = grid[ny * cols + nx];
+                        for (let i = 0; i < cell.length; i++) {
+                            for (let j = 0; j < neighborCell.length; j++) {
+                                applyLJ(cell[i], neighborCell[j]);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    function applyLJ(p1, p2) {
+        let dx = p1.x - p2.x;
+        let dy = p1.y - p2.y;
+
+        if (dx > canvas.width / 2) dx -= canvas.width;
+        else if (dx < -canvas.width / 2) dx += canvas.width;
+
+        let rSq = dx * dx + dy * dy;
+
+        if (rSq < rcutSq && rSq > 0.5) { 
+            let r2inv = (sigma * sigma) / rSq;
+            let r6inv = r2inv * r2inv * r2inv;
+            
+            let forceOverR = 24.0 * epsilon * r6inv * (2.0 * r6inv - 1.0) / (rSq * mass);
+            
+            if (forceOverR > 200.0) forceOverR = 200.0;
+
+            let fx = forceOverR * dx;
+            let fy = forceOverR * dy;
+
+            p1.ax += fx;
+            p1.ay += fy;
+            p2.ax -= fx;
+            p2.ay -= fy;
+        }
+    }
+
+    function thermostat() {
+        let currentKineticEnergy = 0;
+        for (let i = 0; i < N; i++) {
+            currentKineticEnergy += 0.5 * mass * (particles[i].vx ** 2 + particles[i].vy ** 2);
+        }
+        let currentTemp = currentKineticEnergy / N;
+        
+        if (currentTemp < 0.0001) currentTemp = 0.0001; 
+        
+        let scale = Math.sqrt(targetTemp / currentTemp);
+        
+        if(scale > 1.05) scale = 1.05;
+        if(scale < 0.95) scale = 0.95;
+
+        for (let i = 0; i < N; i++) {
+            particles[i].vx *= scale;
+            particles[i].vy *= scale;
+        }
+    }
+
+    function integrate() {
+        let dt = timeStep;
+        
+        for (let i = 0; i < N; i++) {
+            let p = particles[i];
+            
+            p.x += p.vx * dt + 0.5 * p.ax * dt * dt;
+            p.y += p.vy * dt + 0.5 * p.ay * dt * dt;
+            
+            p.vx += 0.5 * p.ax * dt;
+            p.vy += 0.5 * p.ay * dt;
+
+            if (p.x < 0) p.x += canvas.width;
+            else if (p.x >= canvas.width) p.x -= canvas.width;
+
+            if (p.y < sigma/2) {
+                p.y = sigma/2;
+                p.vy *= -1; 
+            } else if (p.y > canvas.height - sigma/2) {
+                p.y = canvas.height - sigma/2;
+                p.vy *= -1;
+            }
+        }
+
+        computeForces();
+
+        for (let i = 0; i < N; i++) {
+            let p = particles[i];
+            p.vx += 0.5 * p.ax * dt;
+            p.vy += 0.5 * p.ay * dt;
+        }
+
+        thermostat();
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        for (let i = 0; i < N; i++) {
+            let p = particles[i];
+            let normalizedHeight = p.y / canvas.height;
+            
+            let r = Math.floor(normalizedHeight * 0 + (1-normalizedHeight) * 239);
+            let g = Math.floor(normalizedHeight * 191 + (1-normalizedHeight) * 35);
+            let b = Math.floor(normalizedHeight * 255 + (1-normalizedHeight) * 60);
+
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, sigma/2, 0, 2 * Math.PI);
+            ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+            ctx.fill();
+        }
+    }
+
+    function loop() {
+        if (isRunning) {
+            for(let s = 0; s < 15; s++){
+                integrate();
+            }
+            draw();
+        }
+        animationId = requestAnimationFrame(loop);
+    }
+
+    // Video Recording Logic
+    function toggleRecording() {
+        if (!isRecording) {
+            
+            // Determine selected quality metrics
+            const qualityMode = sVideoQuality.value;
+            let fps = 30;
+            let bitrate = 2500000; // 2.5 Mbps
+            
+            if (qualityMode === "high") {
+                fps = 60;
+                bitrate = 8000000; // 8 Mbps
+            } else if (qualityMode === "super") {
+                fps = 60;
+                bitrate = 50000000; // 50 Mbps
+            }
+
+            const stream = canvas.captureStream(fps); 
+            
+            mediaRecorder = new MediaRecorder(stream, { 
+                mimeType: 'video/webm',
+                videoBitsPerSecond: bitrate 
+            });
+            
+            mediaRecorder.ondataavailable = function(e) {
+                if (e.data.size > 0) {
+                    recordedChunks.push(e.data);
+                }
+            };
+
+            mediaRecorder.onstop = function() {
+                const blob = new Blob(recordedChunks, { type: 'video/webm' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = `phase_simulation_${qualityMode}.webm`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                recordedChunks = [];
+            };
+
+            mediaRecorder.start();
+            isRecording = true;
+            sVideoQuality.disabled = true; // Prevent changing quality mid-record
+            btnRecord.textContent = "⏹ Stop & Save Video";
+            btnRecord.classList.add("recording-active");
+        } else {
+            mediaRecorder.stop();
+            isRecording = false;
+            sVideoQuality.disabled = false;
+            btnRecord.textContent = "⏺ Start Recording (.webm)";
+            btnRecord.classList.remove("recording-active");
+        }
+    }
+
+    // Modal Logic
+    function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+    function closeOnBackground(event, id) { if (event.target.id === id) { closeModal(id); } }
+
+    // Listeners
+    sParticles.addEventListener('input', (e) => { vParticles.textContent = e.target.value; });
+    sParticles.addEventListener('change', () => { initSystem(); });
+    sTemp.addEventListener('input', (e) => {
+        targetTemp = parseFloat(e.target.value);
+        vTemp.textContent = targetTemp.toFixed(2);
+    });
+    sGravity.addEventListener('input', (e) => {
+        gravity = parseFloat(e.target.value);
+        vGravity.textContent = gravity.toFixed(3);
+    });
+    
+    btnPlay.addEventListener('click', () => {
+        isRunning = !isRunning;
+        btnPlay.textContent = isRunning ? "Pause" : "Start";
+        btnPlay.style.backgroundColor = isRunning ? "#ef233c" : "#06d6a0";
+    });
+    btnReset.addEventListener('click', () => { initSystem(); });
+    btnRecord.addEventListener('click', toggleRecording);
+
+    initSystem();
+    loop();
+</script>
+</body>
+</html>

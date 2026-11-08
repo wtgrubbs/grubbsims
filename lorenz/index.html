@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lorenz Strange Attractor</title>
+    <!-- Tailwind CSS for rapid, responsive UI styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Plotly.js for high-performance 3D WebGL rendering -->
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #e2e8f0; overflow: hidden; }
+        
+        /* Custom Scrollbar for sidebar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+        /* Custom range slider styling */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #38bdf8;
+            cursor: pointer;
+            margin-top: -6px;
+            box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #334155;
+            border-radius: 2px;
+        }
+        input[type=range]:focus { outline: none; }
+        
+        /* Modal transitions */
+        .modal-enter { opacity: 0; transform: scale(0.95); }
+        .modal-enter-active { opacity: 1; transform: scale(1); transition: opacity 300ms, transform 300ms; }
+        
+        #plot-container { width: 100%; height: 100%; }
+        
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(10px);
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+        }
+    </style>
+</head>
+<body class="flex h-screen w-screen overflow-hidden text-sm">
+
+    <!-- Sidebar Control Panel -->
+    <aside class="glass-panel w-80 h-full flex flex-col z-10 shadow-2xl overflow-y-auto">
+        <div class="p-6 border-b border-slate-700">
+            <h1 class="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500 mb-2">
+                GrubbSims
+            </h1>
+            <h2 class="text-lg font-semibold text-slate-200">Lorenz Attractor</h2>
+            <p class="text-xs text-slate-400 mt-1">Numerical Integration Simulator</p>
+        </div>
+
+        <div class="p-4 grid grid-cols-2 gap-2 border-b border-slate-700 sticky top-0 bg-slate-900/90 backdrop-blur z-20">
+            <button id="btn-toggle" class="col-span-1 bg-cyan-600 hover:bg-cyan-500 text-white py-2 rounded shadow transition-colors font-semibold flex items-center justify-center gap-2">
+                <i class="fas fa-play" id="icon-toggle"></i> <span id="text-toggle">Start</span>
+            </button>
+            <button id="btn-clear" class="col-span-1 bg-slate-700 hover:bg-slate-600 text-white py-2 rounded shadow transition-colors font-semibold flex items-center justify-center gap-2">
+                <i class="fas fa-trash-alt"></i> Clear
+            </button>
+            <button id="btn-theory" class="col-span-2 mt-2 border border-cyan-700 hover:bg-cyan-900/50 text-cyan-400 py-2 rounded transition-colors font-semibold flex items-center justify-center gap-2">
+                <i class="fas fa-book-open"></i> Underlying Theory
+            </button>
+        </div>
+
+        <div class="p-5 flex-1 flex flex-col gap-6">
+            <section>
+                <h3 class="text-cyan-400 font-semibold mb-3 border-b border-slate-700 pb-1 flex items-center gap-2">
+                    <i class="fas fa-sliders-h"></i> System Parameters
+                </h3>
+                
+                <div class="mb-3">
+                    <div class="flex justify-between mb-1">
+                        <label class="text-slate-300">Prandtl (<span class="italic font-serif">σ</span>)</label>
+                        <span id="val-sigma" class="text-cyan-300 font-mono">10.0</span>
+                    </div>
+                    <input type="range" id="slider-sigma" min="0" max="50" step="0.1" value="10">
+                </div>
+                
+                <div class="mb-3">
+                    <div class="flex justify-between mb-1">
+                        <label class="text-slate-300">Rayleigh (<span class="italic font-serif">ρ</span>)</label>
+                        <span id="val-rho" class="text-cyan-300 font-mono">28.0</span>
+                    </div>
+                    <input type="range" id="slider-rho" min="0" max="100" step="0.1" value="28">
+                </div>
+                
+                <div class="mb-3">
+                    <div class="flex justify-between mb-1">
+                        <label class="text-slate-300">Beta (<span class="italic font-serif">β</span>)</label>
+                        <span id="val-beta" class="text-cyan-300 font-mono">2.667</span>
+                    </div>
+                    <input type="range" id="slider-beta" min="0" max="10" step="0.001" value="2.667">
+                </div>
+            </section>
+
+            <section>
+                <h3 class="text-cyan-400 font-semibold mb-3 border-b border-slate-700 pb-1 flex items-center gap-2">
+                    <i class="fas fa-crosshairs"></i> Initial Conditions
+                </h3>
+                
+                <div class="mb-3">
+                    <div class="flex justify-between mb-1">
+                        <label class="text-slate-300">Start X₀</label>
+                        <span id="val-x0" class="text-cyan-300 font-mono">0.1</span>
+                    </div>
+                    <input type="range" id="slider-x0" min="-20" max="20" step="0.1" value="0.1">
+                </div>
+
+                <div class="mb-3">
+                    <div class="flex justify-between mb-1">
+                        <label class="text-slate-300">Start Y₀</label>
+                        <span id="val-y0" class="text-cyan-300 font-mono">0.0</span>
+                    </div>
+                    <input type="range" id="slider-y0" min="-20" max="20" step="0.1" value="0">
+                </div>
+
+                <div class="mb-3">
+                    <div class="flex justify-between mb-1">
+                        <label class="text-slate-300">Start Z₀</label>
+                        <span id="val-z0" class="text-cyan-300 font-mono">0.0</span>
+                    </div>
+                    <input type="range" id="slider-z0" min="-20" max="20" step="0.1" value="0">
+                </div>
+                <p class="text-[10px] text-slate-500 mt-1 leading-tight">Changes to initial conditions apply immediately to the current position.</p>
+            </section>
+
+            <section>
+                <h3 class="text-cyan-400 font-semibold mb-3 border-b border-slate-700 pb-1 flex items-center gap-2">
+                    <i class="fas fa-microchip"></i> Computational Finesse
+                </h3>
+                
+                <div class="mb-3">
+                    <div class="flex justify-between mb-1" title="Integration step size. Smaller = higher resolution but slower evolution.">
+                        <label class="text-slate-300">Step Size (dt)</label>
+                        <span id="val-dt" class="text-cyan-300 font-mono">0.010</span>
+                    </div>
+                    <input type="range" id="slider-dt" min="0.001" max="0.05" step="0.001" value="0.01">
+                </div>
+
+                <div class="mb-3">
+                    <div class="flex justify-between mb-1" title="Number of points calculated per frame.">
+                        <label class="text-slate-300">Steps per Frame</label>
+                        <span id="val-speed" class="text-cyan-300 font-mono">5</span>
+                    </div>
+                    <input type="range" id="slider-speed" min="1" max="50" step="1" value="5">
+                </div>
+
+                <div class="mb-3">
+                    <div class="flex justify-between mb-1" title="Maximum length of the trail.">
+                        <label class="text-slate-300">Max Trail Length</label>
+                        <span id="val-maxpts" class="text-cyan-300 font-mono">5000</span>
+                    </div>
+                    <input type="range" id="slider-maxpts" min="1000" max="20000" step="500" value="5000">
+                </div>
+            </section>
+
+            <section>
+                <h3 class="text-cyan-400 font-semibold mb-3 border-b border-slate-700 pb-1 flex items-center gap-2">
+                    <i class="fas fa-palette"></i> Appearance
+                </h3>
+                
+                <div class="mb-3">
+                    <div class="flex justify-between mb-1">
+                        <label class="text-slate-300">Line Weight</label>
+                        <span id="val-lineweight" class="text-cyan-300 font-mono">2.0</span>
+                    </div>
+                    <input type="range" id="slider-lineweight" min="0.5" max="10" step="0.5" value="2">
+                </div>
+
+                <div class="flex justify-between items-center mb-3">
+                    <label class="text-slate-300">Trace Color</label>
+                    <input type="color" id="color-trace" value="#00f0ff" class="w-8 h-8 rounded cursor-pointer bg-transparent border-0 p-0">
+                </div>
+
+                <div class="flex justify-between items-center mb-3">
+                    <label class="text-slate-300">Background Color</label>
+                    <input type="color" id="color-bg" value="#050505" class="w-8 h-8 rounded cursor-pointer bg-transparent border-0 p-0">
+                </div>
+            </section>
+        </div>
+    </aside>
+
+    <!-- Main Plot Area -->
+    <main class="flex-1 relative bg-black">
+        <div id="plot-container"></div>
+        
+        <!-- Loading Overlay -->
+        <div id="loading-overlay" class="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm transition-opacity duration-500">
+            <i class="fas fa-circle-notch fa-spin text-5xl text-cyan-400 mb-4"></i>
+            <h2 class="text-xl font-semibold tracking-widest text-slate-200">INITIALIZING ENGINE</h2>
+        </div>
+    </main>
+
+    <!-- Theory Modal -->
+    <div id="modal-theory" class="fixed inset-0 z-50 flex items-center justify-center hidden bg-black/80 backdrop-blur-sm p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            
+            <div class="p-5 border-b border-slate-700 flex justify-between items-center bg-slate-800">
+                <h2 class="text-2xl font-bold text-cyan-400"><i class="fas fa-book-reader mr-2"></i> Underlying Theory: The Lorenz System</h2>
+                <button id="btn-close-modal" class="text-slate-400 hover:text-white transition-colors">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            
+            <div class="p-6 overflow-y-auto text-slate-300 leading-relaxed space-y-6">
+                
+                <section>
+                    <h3 class="text-xl font-semibold text-white mb-2">History & Atmospheric Convection</h3>
+                    <p>
+                        In 1963, meteorologist and mathematician <strong>Edward Lorenz</strong> developed a simplified mathematical model for atmospheric convection. He was attempting to predict weather patterns by mathematically modeling how air is heated by the earth, rises, cools, and falls. Instead of predictable weather forecasting, Lorenz stumbled upon something revolutionary: his system demonstrated what is now famously known as <em>deterministic chaos</em>.
+                    </p>
+                </section>
+
+                <section>
+                    <h3 class="text-xl font-semibold text-white mb-2">The Mathematics of Chaos</h3>
+                    <p>
+                        The Lorenz system is defined by three coupled, non-linear ordinary differential equations:
+                    </p>
+                    <div class="bg-slate-950 p-4 rounded-lg my-3 font-mono text-cyan-300 flex flex-col gap-2 text-center text-lg border border-slate-800">
+                        <span>dx/dt = σ(y - x)</span>
+                        <span>dy/dt = x(ρ - z) - y</span>
+                        <span>dz/dt = xy - βz</span>
+                    </div>
+                    <ul class="list-disc list-inside space-y-1 ml-2 text-sm">
+                        <li><strong>x</strong>: Rate of convective overturning.</li>
+                        <li><strong>y</strong>: Horizontal temperature variation.</li>
+                        <li><strong>z</strong>: Vertical temperature variation.</li>
+                        <li><strong>σ (Prandtl number)</strong>: Ratio of fluid momentum to thermal diffusivity.</li>
+                        <li><strong>ρ (Rayleigh number)</strong>: Proportional to the temperature difference between the top and bottom of the fluid.</li>
+                        <li><strong>β</strong>: Geometric ratio of the convection cell.</li>
+                    </ul>
+                </section>
+
+                <section>
+                    <h3 class="text-xl font-semibold text-white mb-2">Numerical Integration</h3>
+                    <p>
+                        Because these equations are non-linear, they cannot be solved analytically (there is no simple formula for the exact answer). Instead, this application uses a <strong>4th-Order Runge-Kutta (RK4)</strong> numerical integration method. RK4 computes the slope at four different points within a time step (dt) and takes a weighted average to calculate the next position. This provides a much higher "finesse" and stability compared to simpler methods like Euler integration, preventing numerical errors from spiraling out of control in highly chaotic trajectories.
+                    </p>
+                </section>
+
+                <section>
+                    <h3 class="text-xl font-semibold text-white mb-2">Sensitive Dependence (The Butterfly Effect)</h3>
+                    <p>
+                        The most profound discovery Lorenz made is that for certain parameter values (like ρ = 28), two completely identical systems starting from points that differ by an infinitesimally small amount (e.g., 0.0001) will quickly diverge and trace entirely different paths. This "sensitive dependence on initial conditions" was coined the <strong>Butterfly Effect</strong>. Despite this chaos, the trajectory never flies off to infinity; it remains trapped on a 3D manifold known as a <strong>Strange Attractor</strong>, taking the visually striking shape of a butterfly.
+                    </p>
+                </section>
+
+                <section class="bg-slate-800/50 p-4 rounded-lg border border-slate-700">
+                    <h3 class="text-lg font-semibold text-cyan-400 mb-2"><i class="fas fa-graduation-cap"></i> Guidance for Exploration</h3>
+                    <p class="text-sm mb-2">Try adjusting the <strong>Rayleigh number (ρ)</strong> to see the system transition between states:</p>
+                    <ul class="list-disc list-inside space-y-1 text-sm">
+                        <li><strong>ρ < 1:</strong> The origin (0,0,0) is a stable attractor. Convection dies out.</li>
+                        <li><strong>1 < ρ < 24.74:</strong> The system settles into two stable fixed points (steady convection rolls). Watch the line spiral inward!</li>
+                        <li><strong>ρ = 28 (Default):</strong> The classic chaotic regime. The trajectory jumps unpredictably between the two lobes.</li>
+                        <li><strong>ρ > 90:</strong> Highly chaotic regimes, interspersed with windows of stable periodic orbits (e.g., at ρ ≈ 99.96).</li>
+                    </ul>
+                </section>
+            </div>
+            <div class="p-4 border-t border-slate-700 bg-slate-800 flex justify-end">
+                <button id="btn-close-modal-bottom" class="bg-cyan-600 hover:bg-cyan-500 text-white py-2 px-6 rounded shadow transition-colors font-semibold">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // DOM Elements
+        const DOM = {
+            plot: document.getElementById('plot-container'),
+            loading: document.getElementById('loading-overlay'),
+            
+            // Buttons
+            btnToggle: document.getElementById('btn-toggle'),
+            iconToggle: document.getElementById('icon-toggle'),
+            textToggle: document.getElementById('text-toggle'),
+            btnClear: document.getElementById('btn-clear'),
+            btnTheory: document.getElementById('btn-theory'),
+            modalTheory: document.getElementById('modal-theory'),
+            btnCloseModal: document.getElementById('btn-close-modal'),
+            btnCloseModalBtn: document.getElementById('btn-close-modal-bottom'),
+            
+            // Sliders and Values
+            sigma: document.getElementById('slider-sigma'),
+            rho: document.getElementById('slider-rho'),
+            beta: document.getElementById('slider-beta'),
+            x0: document.getElementById('slider-x0'),
+            y0: document.getElementById('slider-y0'),
+            z0: document.getElementById('slider-z0'),
+            dt: document.getElementById('slider-dt'),
+            speed: document.getElementById('slider-speed'),
+            maxpts: document.getElementById('slider-maxpts'),
+            lineweight: document.getElementById('slider-lineweight'),
+            
+            valSigma: document.getElementById('val-sigma'),
+            valRho: document.getElementById('val-rho'),
+            valBeta: document.getElementById('val-beta'),
+            valX0: document.getElementById('val-x0'),
+            valY0: document.getElementById('val-y0'),
+            valZ0: document.getElementById('val-z0'),
+            valDt: document.getElementById('val-dt'),
+            valSpeed: document.getElementById('val-speed'),
+            valMaxpts: document.getElementById('val-maxpts'),
+            valLineweight: document.getElementById('val-lineweight'),
+            
+            // Colors
+            colorTrace: document.getElementById('color-trace'),
+            colorBg: document.getElementById('color-bg')
+        };
+
+        // System State
+        let isRunning = false;
+        let animationFrameId = null;
+        
+        // Current Particle Position
+        let curX = parseFloat(DOM.x0.value);
+        let curY = parseFloat(DOM.y0.value);
+        let curZ = parseFloat(DOM.z0.value);
+
+        
+        // The core Lorenz Equations
+        function lorenzDerivatives(x, y, z, sigma, rho, beta) {
+            const dx = sigma * (y - x);
+            const dy = x * (rho - z) - y;
+            const dz = (x * y) - (beta * z);
+            return [dx, dy, dz];
+        }
+
+        // 4th Order Runge-Kutta Integrator for high stability
+        function stepRK4(x, y, z, dt, sigma, rho, beta) {
+            // k1
+            const [dx1, dy1, dz1] = lorenzDerivatives(x, y, z, sigma, rho, beta);
+            const k1x = dx1 * dt;
+            const k1y = dy1 * dt;
+            const k1z = dz1 * dt;
+
+            // k2
+            const [dx2, dy2, dz2] = lorenzDerivatives(x + 0.5*k1x, y + 0.5*k1y, z + 0.5*k1z, sigma, rho, beta);
+            const k2x = dx2 * dt;
+            const k2y = dy2 * dt;
+            const k2z = dz2 * dt;
+
+            // k3
+            const [dx3, dy3, dz3] = lorenzDerivatives(x + 0.5*k2x, y + 0.5*k2y, z + 0.5*k2z, sigma, rho, beta);
+            const k3x = dx3 * dt;
+            const k3y = dy3 * dt;
+            const k3z = dz3 * dt;
+
+            // k4
+            const [dx4, dy4, dz4] = lorenzDerivatives(x + k3x, y + k3y, z + k3z, sigma, rho, beta);
+            const k4x = dx4 * dt;
+            const k4y = dy4 * dt;
+            const k4z = dz4 * dt;
+
+            // Compute next position
+            const nextX = x + (k1x + 2*k2x + 2*k3x + k4x) / 6.0;
+            const nextY = y + (k1y + 2*k2y + 2*k3y + k4y) / 6.0;
+            const nextZ = z + (k1z + 2*k2z + 2*k3z + k4z) / 6.0;
+
+            return [nextX, nextY, nextZ];
+        }
+
+        
+        function initPlotly() {
+            const traceColor = DOM.colorTrace.value;
+            const bgColor = DOM.colorBg.value;
+            const lineWeight = parseFloat(DOM.lineweight.value);
+
+            const trace = {
+                x: [curX],
+                y: [curY],
+                z: [curZ],
+                mode: 'lines',
+                type: 'scatter3d',
+                line: {
+                    color: traceColor,
+                    width: lineWeight,
+                    // Optionally, an opacity gradient could go here, but a solid intense line is best for performance
+                }
+            };
+
+            const axisTemplate = {
+                showbackground: true,
+                backgroundcolor: bgColor,
+                gridcolor: 'rgba(255, 255, 255, 0.1)',
+                zerolinecolor: 'rgba(255, 255, 255, 0.2)',
+                color: '#64748b',
+                titlefont: { color: '#94a3b8' }
+            };
+
+            const layout = {
+                autosize: true,
+                margin: { l: 0, r: 0, b: 0, t: 0 },
+                paper_bgcolor: bgColor,
+                scene: {
+                    xaxis: { ...axisTemplate, title: 'X Axis' },
+                    yaxis: { ...axisTemplate, title: 'Y Axis' },
+                    zaxis: { ...axisTemplate, title: 'Z Axis' },
+                    camera: {
+                        eye: { x: 1.5, y: 1.5, z: 1.2 }, // Angled view
+                        up: { x: 0, y: 0, z: 1 }
+                    }
+                },
+                showlegend: false,
+                hovermode: false // Disable hover for massive performance gain
+            };
+
+            const config = {
+                responsive: true,
+                displayModeBar: true,
+                displaylogo: false,
+                modeBarButtonsToRemove: ['resetCameraDefault3d', 'hoverClosest3d']
+            };
+
+            Plotly.newPlot(DOM.plot, [trace], layout, config).then(() => {
+                // Fade out loading overlay once Plotly is ready
+                setTimeout(() => {
+                    DOM.loading.style.opacity = '0';
+                    setTimeout(() => DOM.loading.classList.add('hidden'), 500);
+                }, 500);
+            });
+        }
+
+        
+        function updateAnimation() {
+            if (!isRunning) return;
+
+            // Retrieve current parameter values
+            const sigma = parseFloat(DOM.sigma.value);
+            const rho = parseFloat(DOM.rho.value);
+            const beta = parseFloat(DOM.beta.value);
+            const dt = parseFloat(DOM.dt.value);
+            const steps = parseInt(DOM.speed.value);
+            const maxPts = parseInt(DOM.maxpts.value);
+
+            // Arrays to hold the batch of points for this frame
+            let xArr = [];
+            let yArr = [];
+            let zArr = [];
+
+            // Compute 'steps' number of RK4 integrations per frame
+            for (let i = 0; i < steps; i++) {
+                const [nX, nY, nZ] = stepRK4(curX, curY, curZ, dt, sigma, rho, beta);
+                curX = nX;
+                curY = nY;
+                curZ = nZ;
+                
+                xArr.push(curX);
+                yArr.push(curY);
+                zArr.push(curZ);
+            }
+
+            // Extend Plotly Traces efficiently
+            Plotly.extendTraces('plot-container', {
+                x: [xArr],
+                y: [yArr],
+                z: [zArr]
+            }, [0], maxPts);
+
+            animationFrameId = requestAnimationFrame(updateAnimation);
+        }
+
+
+        // Toggle Start/Pause
+        function toggleSimulation() {
+            isRunning = !isRunning;
+            if (isRunning) {
+                DOM.btnToggle.classList.replace('bg-cyan-600', 'bg-amber-600');
+                DOM.btnToggle.classList.replace('hover:bg-cyan-500', 'hover:bg-amber-500');
+                DOM.iconToggle.classList.replace('fa-play', 'fa-pause');
+                DOM.textToggle.textContent = 'Pause';
+                updateAnimation();
+            } else {
+                DOM.btnToggle.classList.replace('bg-amber-600', 'bg-cyan-600');
+                DOM.btnToggle.classList.replace('hover:bg-amber-500', 'hover:bg-cyan-500');
+                DOM.iconToggle.classList.replace('fa-pause', 'fa-play');
+                DOM.textToggle.textContent = 'Start';
+                if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            }
+        }
+        DOM.btnToggle.addEventListener('click', toggleSimulation);
+
+        // Clear and Reset Plot
+        function clearSimulation() {
+            // Stop if running
+            if (isRunning) toggleSimulation();
+            
+            // Reset coordinate state to current slider values
+            curX = parseFloat(DOM.x0.value);
+            curY = parseFloat(DOM.y0.value);
+            curZ = parseFloat(DOM.z0.value);
+
+            // Redraw from scratch
+            const traceColor = DOM.colorTrace.value;
+            const lineWeight = parseFloat(DOM.lineweight.value);
+
+            const update = {
+                x: [[curX]],
+                y: [[curY]],
+                z: [[curZ]],
+                'line.color': traceColor,
+                'line.width': lineWeight
+            };
+
+            Plotly.update('plot-container', update, {}, [0]);
+        }
+        DOM.btnClear.addEventListener('click', clearSimulation);
+
+        // Modal Logic
+        function openModal() {
+            DOM.modalTheory.classList.remove('hidden');
+            // Trigger reflow for animation
+            void DOM.modalTheory.offsetWidth; 
+            DOM.modalTheory.firstElementChild.classList.add('modal-enter-active');
+        }
+        function closeModal() {
+            DOM.modalTheory.firstElementChild.classList.remove('modal-enter-active');
+            setTimeout(() => DOM.modalTheory.classList.add('hidden'), 300);
+        }
+        DOM.btnTheory.addEventListener('click', openModal);
+        DOM.btnCloseModal.addEventListener('click', closeModal);
+        DOM.btnCloseModalBtn.addEventListener('click', closeModal);
+
+
+        // Helper to bind slider to display text
+        function bindSlider(sliderId, textId, numDecimals = 1, onChange = null) {
+            const slider = document.getElementById(sliderId);
+            const text = document.getElementById(textId);
+            slider.addEventListener('input', (e) => {
+                const val = parseFloat(e.target.value);
+                text.textContent = val.toFixed(numDecimals);
+                if(onChange) onChange(val);
+            });
+        }
+
+        // Bind Parameters
+        bindSlider('slider-sigma', 'val-sigma', 1);
+        bindSlider('slider-rho', 'val-rho', 1);
+        bindSlider('slider-beta', 'val-beta', 3);
+
+        // Bind Initial Conditions (Directly update current position if user slides it manually)
+        bindSlider('slider-x0', 'val-x0', 1, (v) => { curX = v; });
+        bindSlider('slider-y0', 'val-y0', 1, (v) => { curY = v; });
+        bindSlider('slider-z0', 'val-z0', 1, (v) => { curZ = v; });
+
+        // Bind Computations
+        bindSlider('slider-dt', 'val-dt', 3);
+        bindSlider('slider-speed', 'val-speed', 0);
+        bindSlider('slider-maxpts', 'val-maxpts', 0);
+
+        // Bind Aesthetics
+        bindSlider('slider-lineweight', 'val-lineweight', 1, (v) => {
+            Plotly.restyle('plot-container', { 'line.width': v }, [0]);
+        });
+        
+        DOM.colorTrace.addEventListener('input', (e) => {
+            Plotly.restyle('plot-container', { 'line.color': e.target.value }, [0]);
+        });
+
+        DOM.colorBg.addEventListener('input', (e) => {
+            const color = e.target.value;
+            const updateLayout = {
+                paper_bgcolor: color,
+                'scene.xaxis.backgroundcolor': color,
+                'scene.yaxis.backgroundcolor': color,
+                'scene.zaxis.backgroundcolor': color,
+            };
+            Plotly.relayout('plot-container', updateLayout);
+        });
+
+        // Initialize Everything
+        window.addEventListener('load', initPlotly);
+        
+        // Handle window resize dynamically to ensure canvas fits perfectly
+        window.addEventListener('resize', () => {
+            Plotly.Plots.resize(DOM.plot);
+        });
+
+    </script>
+</body>
+</html>

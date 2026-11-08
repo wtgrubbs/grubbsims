@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Matrix Mechanics Lab | 2x2 Pocket Cube</title>
+    
+    <!-- MathJax Configuration and Script -->
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']]
+            },
+            svg: { fontCache: 'global' }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: { 500: '#06b6d4', 600: '#0891b2', 900: '#0e7490' },
+                        matrix: { zero: '#0f172a', one: '#38bdf8', block: '#1e1b4b', active: '#22c55e' }
+                    },
+                    fontFamily: {
+                        mono: ['Fira Code', 'JetBrains Mono', 'Consolas', 'monospace'],
+                        sans: ['Inter', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Three.js and OrbitControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@300;400;500;600;700&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #020617;
+            color: #f8fafc;
+            overflow-x: hidden;
+        }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #020617; }
+        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #334155; }
+
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .matrix-grid {
+            display: grid;
+            grid-template-columns: repeat(24, minmax(0, 1fr));
+            gap: 1px;
+            background-color: #1e293b;
+            padding: 2px;
+            border-radius: 4px;
+        }
+
+        .block-grid {
+            display: grid;
+            grid-template-columns: repeat(8, minmax(0, 1fr));
+            gap: 3px;
+            background-color: #0f172a;
+            padding: 4px;
+            border-radius: 6px;
+        }
+
+        .matrix-cell { aspect-ratio: 1; transition: all 0.15s ease; }
+        .matrix-cell:hover {
+            transform: scale(1.4);
+            z-index: 20;
+            box-shadow: 0 0 8px rgba(56, 189, 248, 0.8);
+        }
+
+        .math-bracket { position: relative; padding: 0 8px; }
+        .math-bracket::before, .math-bracket::after {
+            content: ''; position: absolute; top: 0; bottom: 0; width: 6px; border: 2px solid #38bdf8;
+        }
+        .math-bracket::before { left: 0; border-right: none; border-radius: 4px 0 0 4px; }
+        .math-bracket::after { right: 0; border-left: none; border-radius: 0 4px 4px 0; }
+        .glow-cyan { box-shadow: 0 0 15px rgba(6, 182, 212, 0.4); }
+        .glow-emerald { box-shadow: 0 0 15px rgba(16, 185, 129, 0.4); }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between">
+
+    <!-- Header Navigation -->
+    <header class="glass-panel sticky top-0 z-40 border-b border-slate-800/80 px-4 py-3">
+        <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg glow-cyan">
+                    <i class="fa-solid fa-cube text-white text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold bg-gradient-to-r from-cyan-400 via-sky-200 to-indigo-400 bg-clip-text text-transparent">
+                        Matrix Mechanics Lab
+                    </h1>
+                    <p class="text-xs text-slate-400">2x2 Pocket Cube State Vector & Block Permutations</p>
+                </div>
+            </div>
+
+            <!-- Stats Bar -->
+            <div class="flex items-center space-x-4 bg-slate-900/90 px-4 py-1.5 rounded-full border border-slate-800">
+                <div class="text-center px-2">
+                    <div class="text-[10px] uppercase tracking-wider text-slate-400">Time</div>
+                    <div id="timerDisplay" class="font-mono text-sm font-bold text-cyan-400">00:00.00</div>
+                </div>
+                <div class="h-6 w-px bg-slate-800"></div>
+                <div class="text-center px-2">
+                    <div class="text-[10px] uppercase tracking-wider text-slate-400">Moves</div>
+                    <div id="movesDisplay" class="font-mono text-sm font-bold text-emerald-400">0</div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex items-center space-x-2 flex-wrap justify-end">
+                <button id="btnScramble" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition flex items-center gap-1.5 shadow">
+                    <i class="fa-solid fa-shuffle"></i> Scramble
+                </button>
+                <button id="btnReset" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-rotate-left"></i> Reset
+                </button>
+                <button id="btnAutoSolve" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition flex items-center gap-1.5 shadow glow-emerald">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Auto Solve
+                </button>
+                <button id="btnAutoAlign" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-teal-600/30 hover:bg-teal-600/50 text-teal-300 border border-teal-500/40 transition flex items-center gap-1.5 shadow">
+                    <i class="fa-solid fa-compass"></i> Auto-Align
+                </button>
+                <button id="btnOpenLesson" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-cyan-600/30 hover:bg-cyan-600/50 text-cyan-300 border border-cyan-500/40 transition">
+                    Matrix Theory
+                </button>
+                <button id="btnOpenExample" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-pink-600/30 hover:bg-pink-600/50 text-pink-300 border border-pink-500/40 transition">
+                    Step-by-Step Example
+                </button>
+                <button id="btnOpenNotation" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 border border-indigo-500/40 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-circle-question"></i> Notation
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 grid grid-cols-1 lg:grid-cols-12 gap-4">
+
+<!-- Left Column: 3D Interactive Canvas & Turn Controls (7 Cols) -->
+        <section class="lg:col-span-7 flex flex-col gap-4">
+            <div class="glass-panel rounded-2xl relative overflow-hidden flex flex-col h-[540px] lg:h-[600px] shadow-2xl border border-slate-800">
+                <div class="absolute top-3 left-3 z-10 flex items-center space-x-2">
+                    <span class="px-2.5 py-1 rounded-md bg-slate-900/80 border border-slate-700 text-xs font-medium text-slate-300 flex items-center gap-1.5">
+                        <i class="fa-solid fa-camera text-cyan-400"></i> Drag to rotate view
+                    </span>
+                </div>
+
+                <div class="absolute top-3 right-3 z-10">
+                    <button id="btnResetCamera" title="Reset Camera View" class="p-2 rounded-md bg-slate-900/80 border border-slate-700 text-xs text-slate-300 hover:text-white transition">
+                        <i class="fa-solid fa-expand"></i>
+                    </button>
+                </div>
+
+                <!-- Three.js Canvas (Now uses flex-1 to fill available space without pushing underneath controls) -->
+                <div id="canvas3d" class="w-full flex-1 cursor-grab active:cursor-grabbing min-h-[300px]"></div>
+
+                <!-- Manual Controls (Shifted to standard document flow to prevent overlap) -->
+                <div class="w-full max-w-lg mx-auto px-2 pb-3 z-10">
+                    <div class="glass-panel p-2 rounded-xl border border-slate-700/80 shadow-2xl bg-slate-950/90 flex flex-col gap-1.5">
+                        <div class="text-[10px] uppercase font-semibold text-slate-400 text-center tracking-wider">
+                            Interactive Face Operators
+                        </div>
+                        <div class="grid grid-cols-6 gap-1">
+                            <button data-move="U" class="move-btn px-2 py-1.5 bg-slate-800 hover:bg-cyan-600 text-cyan-300 font-mono font-bold rounded text-xs border border-slate-700 transition">U</button>
+                            <button data-move="D" class="move-btn px-2 py-1.5 bg-slate-800 hover:bg-yellow-600 text-yellow-300 font-mono font-bold rounded text-xs border border-slate-700 transition">D</button>
+                            <button data-move="L" class="move-btn px-2 py-1.5 bg-slate-800 hover:bg-green-600 text-green-300 font-mono font-bold rounded text-xs border border-slate-700 transition">L</button>
+                            <button data-move="R" class="move-btn px-2 py-1.5 bg-slate-800 hover:bg-blue-600 text-blue-300 font-mono font-bold rounded text-xs border border-slate-700 transition">R</button>
+                            <button data-move="F" class="move-btn px-2 py-1.5 bg-slate-800 hover:bg-red-600 text-red-300 font-mono font-bold rounded text-xs border border-slate-700 transition">F</button>
+                            <button data-move="B" class="move-btn px-2 py-1.5 bg-slate-800 hover:bg-orange-600 text-orange-300 font-mono font-bold rounded text-xs border border-slate-700 transition">B</button>
+
+                            <button data-move="U'" class="move-btn px-2 py-1.5 bg-slate-900 hover:bg-cyan-700 text-cyan-400 font-mono font-bold rounded text-xs border border-slate-800 transition">U'</button>
+                            <button data-move="D'" class="move-btn px-2 py-1.5 bg-slate-900 hover:bg-yellow-700 text-yellow-400 font-mono font-bold rounded text-xs border border-slate-800 transition">D'</button>
+                            <button data-move="L'" class="move-btn px-2 py-1.5 bg-slate-900 hover:bg-green-700 text-green-400 font-mono font-bold rounded text-xs border border-slate-800 transition">L'</button>
+                            <button data-move="R'" class="move-btn px-2 py-1.5 bg-slate-900 hover:bg-blue-700 text-blue-400 font-mono font-bold rounded text-xs border border-slate-800 transition">R'</button>
+                            <button data-move="F'" class="move-btn px-2 py-1.5 bg-slate-900 hover:bg-red-700 text-red-400 font-mono font-bold rounded text-xs border border-slate-800 transition">F'</button>
+                            <button data-move="B'" class="move-btn px-2 py-1.5 bg-slate-900 hover:bg-orange-700 text-orange-400 font-mono font-bold rounded text-xs border border-slate-800 transition">B'</button>
+                        </div>
+                        
+                        <div class="text-[10px] uppercase font-semibold text-slate-400 text-center tracking-wider mt-2">
+                            Whole-Cube Rotations (Frame Shift)
+                        </div>
+                        <div class="grid grid-cols-6 gap-1">
+                            <button data-move="x" class="move-btn px-2 py-1 bg-indigo-900/60 hover:bg-indigo-600 text-indigo-200 font-mono font-bold rounded text-xs border border-indigo-700">x</button>
+                            <button data-move="y" class="move-btn px-2 py-1 bg-indigo-900/60 hover:bg-indigo-600 text-indigo-200 font-mono font-bold rounded text-xs border border-indigo-700">y</button>
+                            <button data-move="z" class="move-btn px-2 py-1 bg-indigo-900/60 hover:bg-indigo-600 text-indigo-200 font-mono font-bold rounded text-xs border border-indigo-700">z</button>
+                            <button data-move="x'" class="move-btn px-2 py-1 bg-indigo-950/80 hover:bg-indigo-700 text-indigo-300 font-mono font-bold rounded text-xs border border-indigo-800">x'</button>
+                            <button data-move="y'" class="move-btn px-2 py-1 bg-indigo-950/80 hover:bg-indigo-700 text-indigo-300 font-mono font-bold rounded text-xs border border-indigo-800">y'</button>
+                            <button data-move="z'" class="move-btn px-2 py-1 bg-indigo-950/80 hover:bg-indigo-700 text-indigo-300 font-mono font-bold rounded text-xs border border-indigo-800">z'</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mathematical Equation Bar -->
+            <div class="glass-panel p-3 rounded-xl border border-slate-800 flex items-center justify-between text-xs font-mono">
+                <div class="flex items-center space-x-2">
+                    <span class="text-slate-400">Current Operation:</span>
+                    <span id="equationDisplay" class="text-cyan-400 font-semibold">$$\vec{v}_{new} = I_{24} \cdot \vec{v}_{current}$$</span>
+                </div>
+                <div class="text-slate-500 text-[11px]">
+                    Last Move: <span id="lastMoveTag" class="text-indigo-300 font-bold">None</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right Column: Matrix Mechanics Inspector (5 Cols) -->
+        <section class="lg:col-span-5 flex flex-col gap-4">
+            <div class="glass-panel rounded-2xl border border-slate-800 flex flex-col h-full min-h-[580px] p-4">
+                
+                <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-3">
+                    <div class="flex items-center space-x-1 bg-slate-900 p-1 rounded-lg border border-slate-800 text-xs w-full">
+                        <button id="tabHeatmapBtn" class="tab-btn flex-1 active px-3 py-1.5 rounded-md font-medium text-cyan-400 bg-slate-800 transition">
+                            Matrix Visualizer
+                        </button>
+                        <button id="tabVectorBtn" class="tab-btn flex-1 px-3 py-1.5 rounded-md font-medium text-slate-400 hover:text-slate-200 transition">
+                            Vector $\vec{v}$
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Heatmap Tab -->
+                <div id="tabHeatmap" class="tab-content flex-1 flex flex-col gap-3">
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="text-slate-300 font-semibold" id="matrixViewTitle">24×24 Sparse Permutation</span>
+                        <div class="flex space-x-1 bg-slate-900 px-2 py-1 rounded border border-slate-800 text-[11px]">
+                            <button id="viewSparse24Btn" class="px-2 py-0.5 rounded bg-cyan-600 text-white font-semibold">24×24</button>
+                            <button id="viewBlock8Btn" class="px-2 py-0.5 rounded text-slate-400 hover:text-white">8×8</button>
+                        </div>
+                    </div>
+
+                    <div class="flex-1 flex flex-col justify-center items-center bg-slate-950 p-3 rounded-xl border border-slate-800/80">
+                        <div id="heatmapContainer24" class="w-full max-w-[340px] aspect-square">
+                            <div id="grid24" class="matrix-grid w-full h-full"></div>
+                        </div>
+                        <div id="blockContainer8" class="hidden w-full max-w-[340px] aspect-square">
+                            <div id="grid8" class="block-grid w-full h-full"></div>
+                        </div>
+                    </div>
+
+                    <!-- Selected Submatrix -->
+                    <div id="submatrixInspector" class="bg-slate-900/90 p-3 rounded-xl border border-slate-800 text-xs flex flex-col gap-1.5">
+                        <div class="flex items-center justify-between text-slate-400">
+                            <span>Active Corner Block Torsion (3×3):</span>
+                            <span id="blockCoordTag" class="text-cyan-400 font-mono font-bold">Block (0,0)</span>
+                        </div>
+                        <div class="flex items-center justify-center gap-4 py-1">
+                            <div class="math-bracket font-mono text-center text-sm font-semibold text-emerald-400">
+                                <div id="submatrixRow0">1 &nbsp; 0 &nbsp; 0</div>
+                                <div id="submatrixRow1">0 &nbsp; 1 &nbsp; 0</div>
+                                <div id="submatrixRow2">0 &nbsp; 0 &nbsp; 1</div>
+                            </div>
+                            <div class="text-[11px] text-slate-400 flex flex-col justify-center">
+                                <div>Type: <span id="submatrixType" class="text-slate-200">Identity $R_0$</span></div>
+                                <div>Det: <span id="submatrixDet" class="text-cyan-400">+1</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Vector Tab -->
+                <div id="tabVector" class="tab-content hidden flex-1 flex flex-col gap-3 overflow-y-auto pr-1">
+                    <div class="text-xs text-slate-300 font-semibold">State Vector Decomposition (8 Cubies × 3 Facelets)</div>
+                    <div id="vectorCubieList" class="space-y-2 text-xs"></div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Matrix Theory Modal -->
+    <div id="modalLesson" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+        <!-- ... keeping original modal content ... -->
+        <div class="glass-panel max-w-2xl w-full rounded-2xl border border-slate-700 shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+            <div class="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/80">
+                <h2 class="text-base font-bold text-white"><i class="fa-solid fa-graduation-cap text-cyan-400 mr-2"></i>Matrix Mechanics Theory</h2>
+                <button class="close-modal text-slate-400 hover:text-white transition" data-target="modalLesson"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div class="p-5 overflow-y-auto space-y-4 text-xs leading-relaxed text-slate-300">
+                <div class="p-3 bg-cyan-950/30 border border-cyan-800/40 rounded-xl">
+                    <h3 class="font-bold text-cyan-300 text-sm mb-2">1. Vector Representation ($\vec{v}$)</h3>
+                    <p>A 2x2 pocket cube contains 8 corner pieces. Each piece has 3 colored stickers (24 total facelets). We define a 24-element state vector representing these 8 blocks:</p>
+                    <div class="text-[13px] text-cyan-200 bg-slate-950 p-2 rounded border border-slate-800 text-center my-2">
+                        $$\vec{v} = [\mathbf{c}_1^T, \mathbf{c}_2^T, \dots, \mathbf{c}_8^T]^T \quad \text{where } \mathbf{c}_i = [s_{i,1}, s_{i,2}, s_{i,3}]^T$$
+                    </div>
+                </div>
+                <div class="p-3 bg-indigo-950/30 border border-indigo-800/40 rounded-xl">
+                    <h3 class="font-bold text-indigo-300 text-sm mb-2">2. Block Permutation Matrices</h3>
+                    <p>Any face turn is a <b>24×24 sparse matrix</b> made of <b>8×8 blocks of 3×3 submatrices</b>. Because the 3 colors on a physical corner are locked together, moving a corner applies a $3 \times 3$ permutation matrix $R_\theta$ to its block.</p>
+                    <div class="text-[13px] text-indigo-200 bg-slate-950 p-2 rounded border border-slate-800 text-center my-2">
+                        $$P = \begin{bmatrix} A_{1,1} & \dots & A_{1,8} \\ \vdots & \ddots & \vdots \\ A_{8,1} & \dots & A_{8,8} \end{bmatrix} \in \mathbb{R}^{24 \times 24}$$
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step-by-Step Example Modal -->
+    <div id="modalExample" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+        <!-- ... keeping original modal content ... -->
+        <div class="glass-panel max-w-3xl w-full rounded-2xl border border-pink-500/50 shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+            <div class="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/80">
+                <h2 class="text-base font-bold text-white"><i class="fa-solid fa-list-ol text-pink-400 mr-2"></i>Step-by-Step Matrix Example</h2>
+                <button class="close-modal text-slate-400 hover:text-white transition" data-target="modalExample"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div class="p-5 overflow-y-auto space-y-4 text-xs leading-relaxed text-slate-300">
+                
+                <h3 class="font-bold text-pink-300 text-sm border-b border-slate-700 pb-1">Applying the $U$ (Up) Face Turn</h3>
+                <p>Let's map out exactly what happens mathematically when you apply a single $U$ move.</p>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="bg-slate-900 p-3 rounded-lg border border-slate-700">
+                        <h4 class="font-bold text-slate-200 mb-1">1. The Array Mapping</h4>
+                        <p class="mb-2">We map the top 4 cubies to the first 4 blocks in our vector $\vec{v}$:</p>
+                        <ul class="list-disc pl-4 space-y-1 text-[11px] text-cyan-200 font-mono">
+                            <li>$\mathbf{c}_1$: Up-Front-Left (UFL)</li>
+                            <li>$\mathbf{c}_2$: Up-Front-Right (UFR)</li>
+                            <li>$\mathbf{c}_3$: Up-Back-Right (UBR)</li>
+                            <li>$\mathbf{c}_4$: Up-Back-Left (UBL)</li>
+                        </ul>
+                    </div>
+
+                    <div class="bg-slate-900 p-3 rounded-lg border border-slate-700">
+                        <h4 class="font-bold text-slate-200 mb-1">2. The Physical Swap</h4>
+                        <p class="mb-2">A clockwise $U$ turn shifts the corners in a cycle:</p>
+                        <div class="text-center font-mono text-emerald-400 bg-slate-950 py-2 rounded">
+                            UFL $\rightarrow$ UBL $\rightarrow$ UBR $\rightarrow$ UFR $\rightarrow$ UFL
+                        </div>
+                        <p class="mt-2 text-[11px]"><i>(Notice that the bottom 4 cubies $\mathbf{c}_5 \dots \mathbf{c}_8$ are completely unchanged.)</i></p>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900 p-4 rounded-lg border border-slate-700">
+                    <h4 class="font-bold text-slate-200 mb-2">3. The Matrix Equation</h4>
+                    <p class="mb-2">To express this physical swap algebraically, we construct an $8 \times 8$ block matrix where the top-left $4 \times 4$ quadrant shifts the vectors, and the bottom-right is the identity matrix $I_4$.</p>
+                    <div class="overflow-x-auto">
+$$
+\begin{bmatrix}
+\mathbf{c}_1 \\ \mathbf{c}_2 \\ \mathbf{c}_3 \\ \mathbf{c}_4 \\ \hline \mathbf{c}_5 \\ \mathbf{c}_6 \\ \mathbf{c}_7 \\ \mathbf{c}_8
+\end{bmatrix}_{\text{new}}
+=
+\left[
+\begin{array}{cccc|cccc}
+0 & 0 & 0 & R_1 & 0 & 0 & 0 & 0 \\
+R_2 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+0 & R_3 & 0 & 0 & 0 & 0 & 0 & 0 \\
+0 & 0 & R_4 & 0 & 0 & 0 & 0 & 0 \\
+\hline
+0 & 0 & 0 & 0 & I & 0 & 0 & 0 \\
+0 & 0 & 0 & 0 & 0 & I & 0 & 0 \\
+0 & 0 & 0 & 0 & 0 & 0 & I & 0 \\
+0 & 0 & 0 & 0 & 0 & 0 & 0 & I
+\end{array}
+\right]
+\cdot
+\begin{bmatrix}
+\mathbf{c}_1 \\ \mathbf{c}_2 \\ \mathbf{c}_3 \\ \mathbf{c}_4 \\ \hline \mathbf{c}_5 \\ \mathbf{c}_6 \\ \mathbf{c}_7 \\ \mathbf{c}_8
+\end{bmatrix}_{\text{current}}
+$$
+                    </div>
+                    <p class="mt-2 text-[11px]">The $3 \times 3$ submatrices $R_k$ not only move the block into the new position, but they permute the internal elements of $\mathbf{c}_i$ to represent how the physical stickers twist spatially as the corner travels around the cube!</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notation Guide Modal -->
+    <div id="modalNotation" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+        <!-- ... keeping original modal content ... -->
+        <div class="glass-panel max-w-2xl w-full rounded-2xl border border-slate-700 shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+            <div class="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/80">
+                <h2 class="text-base font-bold text-white"><i class="fa-solid fa-circle-question text-indigo-400 mr-2"></i>Cube Notation Guide</h2>
+                <button class="close-modal text-slate-400 hover:text-white transition" data-target="modalNotation"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div class="p-5 space-y-4 text-xs leading-relaxed text-slate-300">
+                
+                <div class="p-4 bg-yellow-900/30 border-l-4 border-yellow-500 rounded-r-xl space-y-2">
+                    <h3 class="font-bold text-yellow-400 text-sm flex items-center gap-2"><i class="fa-solid fa-triangle-exclamation"></i> Absolute Coordinate System</h3>
+                    <p class="text-yellow-200/90 text-[13px]">
+                        The face rotation buttons map to the cube's <strong>absolute 3D space</strong>. They do <em>not</em> change based on where you move the camera. 
+                        If you rotate the camera to look at the back, pressing 'F' (Front) still rotates the side facing away from you!
+                    </p>
+                </div>
+
+                <div class="p-3 bg-slate-900 border border-slate-800 rounded-xl">
+                    <p class="mb-3">A letter means a <strong>90° clockwise</strong> turn (looking directly at that face). An apostrophe (e.g., U') means <strong>90° counter-clockwise</strong>.</p>
+                    <div class="grid grid-cols-3 gap-2 font-mono text-[11px]">
+                        <div class="bg-slate-950 p-2 rounded"><span class="text-cyan-400 font-bold">U</span>: Up</div>
+                        <div class="bg-slate-950 p-2 rounded"><span class="text-yellow-400 font-bold">D</span>: Down</div>
+                        <div class="bg-slate-950 p-2 rounded"><span class="text-red-400 font-bold">F</span>: Front</div>
+                        <div class="bg-slate-950 p-2 rounded"><span class="text-orange-400 font-bold">B</span>: Back</div>
+                        <div class="bg-slate-950 p-2 rounded"><span class="text-green-400 font-bold">L</span>: Left</div>
+                        <div class="bg-slate-950 p-2 rounded"><span class="text-blue-400 font-bold">R</span>: Right</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Victory Modal -->
+    <div id="modalVictory" class="hidden fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-lg flex items-center justify-center p-4">
+        <!-- ... keeping original modal content ... -->
+        <div class="glass-panel max-w-md w-full rounded-2xl border border-emerald-500/50 shadow-2xl p-6 text-center space-y-4 glow-emerald">
+            <div class="w-16 h-16 rounded-full bg-emerald-500/20 border border-emerald-400 mx-auto flex items-center justify-center text-emerald-400 text-3xl animate-bounce">
+                <i class="fa-solid fa-trophy"></i>
+            </div>
+            <div>
+                <h2 class="text-xl font-bold text-white">Cube Solved!</h2>
+                <p class="text-xs text-slate-400 mt-0.5">Matrix State Hydro-Stabilized</p>
+            </div>
+            <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 grid grid-cols-2 gap-2 text-xs font-mono">
+                <div>
+                    <div class="text-[10px] text-slate-400">Time</div>
+                    <div id="vicTime" class="text-cyan-400 font-bold text-sm">00:00</div>
+                </div>
+                <div>
+                    <div class="text-[10px] text-slate-400">Moves</div>
+                    <div id="vicMoves" class="text-emerald-400 font-bold text-sm">0</div>
+                </div>
+            </div>
+            <div class="pt-2">
+                <button class="close-modal w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold transition" data-target="modalVictory">
+                    Continue Experimenting
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const COLORS = {
+            W: { hex: '#ffffff' }, Y: { hex: '#facc15' },
+            R: { hex: '#ef4444' }, O: { hex: '#f97316' },
+            G: { hex: '#22c55e' }, B: { hex: '#3b82f6' }
+        };
+
+        const SOLVED_STATE = [
+            'W','R','G',  'W','R','B',  'W','O','B',  'W','O','G',
+            'Y','R','G',  'Y','R','B',  'Y','O','B',  'Y','O','G'
+        ];
+
+        // Core permutations reflecting absolute spatial positions (0-23 mapping)
+        const MOVE_PERMS = {
+            U: [3,5,4, 6,8,7, 9,11,10, 0,2,1, 12,13,14, 15,16,17, 18,19,20, 21,22,23],
+            D: [0,1,2, 3,4,5, 6,7,8, 9,10,11, 21,23,22, 12,14,13, 15,17,16, 18,20,19],
+            R: [0,1,2, 16,15,17, 4,3,5, 9,10,11, 12,13,14, 19,18,20, 7,6,8, 21,22,23],
+            L: [10,9,11, 3,4,5, 6,7,8, 22,21,23, 1,0,2, 15,16,17, 18,19,20, 13,12,14],
+            F: [14,13,12, 2,1,0, 6,7,8, 9,10,11, 17,16,15, 5,4,3, 18,19,20, 21,22,23],
+            B: [0,1,2, 3,4,5, 20,19,18, 8,7,6, 12,13,14, 15,16,17, 23,22,21, 11,10,9]
+        };
+
+        function getInverse(perm) {
+            const inv = new Array(24);
+            for (let i = 0; i < 24; i++) inv[perm[i]] = i;
+            return inv;
+        }
+
+        MOVE_PERMS["U'"] = getInverse(MOVE_PERMS.U);
+        MOVE_PERMS["D'"] = getInverse(MOVE_PERMS.D);
+        MOVE_PERMS["R'"] = getInverse(MOVE_PERMS.R);
+        MOVE_PERMS["L'"] = getInverse(MOVE_PERMS.L);
+        MOVE_PERMS["F'"] = getInverse(MOVE_PERMS.F);
+        MOVE_PERMS["B'"] = getInverse(MOVE_PERMS.B);
+
+        // Whole-Cube Rotations via opposite face turns mapping
+        MOVE_PERMS['x'] = MOVE_PERMS.R.map(idx => MOVE_PERMS["L'"][idx]);
+        MOVE_PERMS['y'] = MOVE_PERMS.U.map(idx => MOVE_PERMS["D'"][idx]);
+        MOVE_PERMS['z'] = MOVE_PERMS.F.map(idx => MOVE_PERMS["B'"][idx]);
+        MOVE_PERMS["x'"] = getInverse(MOVE_PERMS['x']);
+        MOVE_PERMS["y'"] = getInverse(MOVE_PERMS['y']);
+        MOVE_PERMS["z'"] = getInverse(MOVE_PERMS['z']);
+
+        // State Vars
+        let stateVector = [...SOLVED_STATE];
+        let moveHistory = [];
+        let timerInterval = null, startTime = null, elapsedMs = 0, isTimerRunning = false;
+        let moveCount = 0;
+        let activeMatrix24 = createIdentity24();
+        let lastMoveName = "None";
+        let isScrambled = false;
+
+        // Animation Queue
+        let animationQueue = [];
+        let isAnimating = false;
+        let currentAnim = null;
+
+        function createIdentity24() {
+            const m = [];
+            for (let i = 0; i < 24; i++) {
+                const r = new Array(24).fill(0);
+                r[i] = 1; m.push(r);
+            }
+            return m;
+        }
+
+        function permToMatrix(perm) {
+            const m = [];
+            for (let i = 0; i < 24; i++) {
+                const r = new Array(24).fill(0);
+                r[perm[i]] = 1; m.push(r);
+            }
+            return m;
+        }
+
+        function multMatrix(A, B) {
+            const C = [];
+            for (let i = 0; i < 24; i++) {
+                const r = new Array(24).fill(0);
+                for (let j = 0; j < 24; j++) {
+                    let s = 0;
+                    for (let k = 0; k < 24; k++) s += A[i][k] * B[k][j];
+                    r[j] = s;
+                }
+                C.push(r);
+            }
+            return C;
+        }
+
+        let scene, camera, renderer, controls;
+        let cubieMeshes = [];
+        let pivotGroup;
+
+        // Map absolute cubie positions for animation target acquisition
+        const CUBIE_DATA = [
+            { pos: new THREE.Vector3(-0.5, 0.5, 0.5), id: 0 }, // UFL
+            { pos: new THREE.Vector3( 0.5, 0.5, 0.5), id: 1 }, // UFR
+            { pos: new THREE.Vector3( 0.5, 0.5,-0.5), id: 2 }, // UBR
+            { pos: new THREE.Vector3(-0.5, 0.5,-0.5), id: 3 }, // UBL
+            { pos: new THREE.Vector3(-0.5,-0.5, 0.5), id: 4 }, // DFL
+            { pos: new THREE.Vector3( 0.5,-0.5, 0.5), id: 5 }, // DFR
+            { pos: new THREE.Vector3( 0.5,-0.5,-0.5), id: 6 }, // DBR
+            { pos: new THREE.Vector3(-0.5,-0.5,-0.5), id: 7 }  // DBL
+        ];
+
+        // Definition of physical rotation axes/angles per move
+        const ANIM_DEF = {
+            U: { axis: new THREE.Vector3(0,1,0), angle: -Math.PI/2, indices: [0,1,2,3] },
+            D: { axis: new THREE.Vector3(0,1,0), angle: Math.PI/2, indices: [4,5,6,7] },
+            R: { axis: new THREE.Vector3(1,0,0), angle: -Math.PI/2, indices: [1,2,5,6] },
+            L: { axis: new THREE.Vector3(1,0,0), angle: Math.PI/2, indices: [0,3,4,7] },
+            F: { axis: new THREE.Vector3(0,0,1), angle: -Math.PI/2, indices: [0,1,4,5] },
+            B: { axis: new THREE.Vector3(0,0,1), angle: Math.PI/2, indices: [2,3,6,7] },
+            
+            x: { axis: new THREE.Vector3(1,0,0), angle: -Math.PI/2, indices: [0,1,2,3,4,5,6,7] },
+            y: { axis: new THREE.Vector3(0,1,0), angle: -Math.PI/2, indices: [0,1,2,3,4,5,6,7] },
+            z: { axis: new THREE.Vector3(0,0,1), angle: -Math.PI/2, indices: [0,1,2,3,4,5,6,7] }
+        };
+        ['U','D','R','L','F','B', 'x', 'y', 'z'].forEach(m => {
+            if (!ANIM_DEF[m+"'"]) {
+                ANIM_DEF[m+"'"] = { axis: ANIM_DEF[m].axis, angle: -ANIM_DEF[m].angle, indices: ANIM_DEF[m].indices };
+            }
+        });
+
+        function init3D() {
+            const container = document.getElementById('canvas3d');
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(40, container.clientWidth / container.clientHeight, 0.1, 100);
+            camera.position.set(3.5, 3.2, 4.5);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            container.appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+
+            scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+            const light1 = new THREE.DirectionalLight(0xffffff, 0.8);
+            light1.position.set(5, 8, 5);
+            scene.add(light1);
+
+            pivotGroup = new THREE.Group();
+            scene.add(pivotGroup);
+
+            const geo = new THREE.BoxGeometry(0.95, 0.95, 0.95);
+            for (let i = 0; i < 8; i++) {
+                const materials = Array(6).fill(new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.3 }));
+                const mesh = new THREE.Mesh(geo, materials);
+                mesh.position.copy(CUBIE_DATA[i].pos).multiplyScalar(1.02);
+                mesh.userData = { initialPos: mesh.position.clone(), id: CUBIE_DATA[i].id };
+                scene.add(mesh);
+                cubieMeshes.push(mesh);
+            }
+
+            updateTextures();
+            window.addEventListener('resize', () => {
+                camera.aspect = container.clientWidth / container.clientHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(container.clientWidth, container.clientHeight);
+            });
+            requestAnimationFrame(renderLoop);
+        }
+
+        function createSticker(hex) {
+            const cvs = document.createElement('canvas');
+            cvs.width = cvs.height = 128;
+            const ctx = cvs.getContext('2d');
+            ctx.fillStyle = '#0f172a'; ctx.fillRect(0,0,128,128);
+            ctx.fillStyle = hex; ctx.beginPath(); ctx.roundRect(8,8,112,112,16); ctx.fill();
+            return new THREE.CanvasTexture(cvs);
+        }
+
+        function updateTextures() {
+            for (let i = 0; i < 8; i++) {
+                const mesh = cubieMeshes[i];
+                const b = i * 3;
+                const c0 = stateVector[b], c1 = stateVector[b+1], c2 = stateVector[b+2];
+                const defMat = new THREE.MeshStandardMaterial({ color: 0x0f172a });
+                
+                for(let f=0; f<6; f++) mesh.material[f] = defMat;
+
+                const t0 = new THREE.MeshStandardMaterial({ map: createSticker(COLORS[c0].hex) });
+                const t1 = new THREE.MeshStandardMaterial({ map: createSticker(COLORS[c1].hex) });
+                const t2 = new THREE.MeshStandardMaterial({ map: createSticker(COLORS[c2].hex) });
+
+                // Face mappings based on absolute cubie index
+                if (i===0) { mesh.material[2]=t0; mesh.material[4]=t1; mesh.material[1]=t2; } // UFL
+                else if (i===1) { mesh.material[2]=t0; mesh.material[4]=t1; mesh.material[0]=t2; } // UFR
+                else if (i===2) { mesh.material[2]=t0; mesh.material[5]=t1; mesh.material[0]=t2; } // UBR
+                else if (i===3) { mesh.material[2]=t0; mesh.material[5]=t1; mesh.material[1]=t2; } // UBL
+                else if (i===4) { mesh.material[3]=t0; mesh.material[4]=t1; mesh.material[1]=t2; } // DFL
+                else if (i===5) { mesh.material[3]=t0; mesh.material[4]=t1; mesh.material[0]=t2; } // DFR
+                else if (i===6) { mesh.material[3]=t0; mesh.material[5]=t1; mesh.material[0]=t2; } // DBR
+                else if (i===7) { mesh.material[3]=t0; mesh.material[5]=t1; mesh.material[1]=t2; } // DBL
+            }
+        }
+
+        function renderLoop(time) {
+            requestAnimationFrame(renderLoop);
+            controls.update();
+            
+            if (currentAnim) {
+                const t = (time - currentAnim.startTime) / currentAnim.duration;
+                if (t >= 1) {
+                    // Animation finished
+                    pivotGroup.quaternion.setFromAxisAngle(currentAnim.def.axis, currentAnim.def.angle);
+                    
+                    // Detach and reset
+                    while(pivotGroup.children.length > 0) {
+                        let child = pivotGroup.children[0];
+                        scene.add(child);
+                        child.position.copy(child.userData.initialPos);
+                        child.rotation.set(0,0,0);
+                    }
+                    pivotGroup.rotation.set(0,0,0);
+                    
+                    // Update Logical State
+                    finalizeMoveState(currentAnim.moveName, currentAnim.recordHistory);
+                    
+                    currentAnim.onComplete();
+                    currentAnim = null;
+                    processAnimationQueue(time);
+                } else {
+                    // Ease-in-out Sine
+                    const easeT = -(Math.cos(Math.PI * t) - 1) / 2;
+                    pivotGroup.quaternion.setFromAxisAngle(currentAnim.def.axis, currentAnim.def.angle * easeT);
+                }
+            } else if (animationQueue.length > 0) {
+                processAnimationQueue(time);
+            } else {
+                isAnimating = false;
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        function processAnimationQueue(time) {
+            if (animationQueue.length === 0) return;
+            isAnimating = true;
+            const next = animationQueue.shift();
+            currentAnim = { ...next, startTime: time || performance.now() };
+
+            // Attach correct cubies to pivot
+            const indices = currentAnim.def.indices;
+            indices.forEach(idx => {
+                const mesh = cubieMeshes.find(m => m.userData.id === idx);
+                if (mesh) pivotGroup.add(mesh);
+            });
+        }
+
+        function queueMove(moveName, duration = 250, recordHistory = true, onComplete = () => {}) {
+            if (!ANIM_DEF[moveName]) return;
+            animationQueue.push({
+                moveName: moveName,
+                def: ANIM_DEF[moveName],
+                duration: duration,
+                recordHistory: recordHistory,
+                onComplete: onComplete
+            });
+        }
+
+        function finalizeMoveState(moveName, recordHistory) {
+            const perm = MOVE_PERMS[moveName];
+            
+            // Apply logical vector swap
+            const nextVec = new Array(24);
+            for(let i=0; i<24; i++) nextVec[i] = stateVector[perm[i]];
+            stateVector = nextVec;
+
+            // Update Matrix
+            const mMat = permToMatrix(perm);
+            activeMatrix24 = multMatrix(mMat, activeMatrix24);
+            
+            lastMoveName = moveName;
+            
+            // Avoid adding whole-cube orientations into solve move history if preferred
+            const isCubeRot = ['x','y','z',"x'","y'","z'"].includes(moveName);
+            
+            if(recordHistory && !isCubeRot) {
+                moveHistory.push(moveName);
+                moveCount++;
+                if (!isTimerRunning && moveCount > 0) {
+                    isTimerRunning = true;
+                    startTime = Date.now() - elapsedMs;
+                    timerInterval = setInterval(updateTimer, 50);
+                }
+            }
+
+            updateTextures(); // redraw fixed meshes based on new state
+            updateUI();
+            checkWin();
+        }
+
+        function updateUI() {
+            renderHeatmap();
+            renderBlocks();
+            renderVector();
+            document.getElementById('movesDisplay').innerText = moveCount;
+            document.getElementById('lastMoveTag').innerText = lastMoveName;
+            document.getElementById('equationDisplay').innerHTML = `$$\\vec{v}_{new} = M_{${lastMoveName.replace("'", "^\\prime")}} \\cdot \\vec{v}_{curr}$$`;
+            if (window.MathJax) MathJax.typesetPromise([document.getElementById('equationDisplay')]).catch(e => {});
+        }
+
+        function renderHeatmap() {
+            const grid = document.getElementById('grid24');
+            grid.innerHTML = '';
+            for(let i=0; i<24; i++){
+                for(let j=0; j<24; j++){
+                    const cell = document.createElement('div');
+                    cell.className = 'matrix-cell rounded-[1px] cursor-pointer';
+                    cell.style.backgroundColor = activeMatrix24[i][j] ? '#38bdf8' : '#0f172a';
+                    cell.onclick = () => inspectSub(Math.floor(i/3), Math.floor(j/3));
+                    grid.appendChild(cell);
+                }
+            }
+        }
+
+        function renderBlocks() {
+            const grid = document.getElementById('grid8');
+            grid.innerHTML = '';
+            for(let bi=0; bi<8; bi++){
+                for(let bj=0; bj<8; bj++){
+                    let on = false;
+                    for(let r=0; r<3; r++) for(let c=0; c<3; c++) if(activeMatrix24[bi*3+r][bj*3+c]) on = true;
+                    const cell = document.createElement('div');
+                    cell.className = 'matrix-cell rounded-md border border-slate-800 flex items-center justify-center font-mono text-[10px] cursor-pointer transition';
+                    if(on){
+                        cell.style.backgroundColor = '#1e1b4b'; cell.style.borderColor = '#6366f1';
+                        cell.innerHTML = `<span class="text-indigo-300 font-bold">A<sub>${bi}${bj}</sub></span>`;
+                    } else {
+                        cell.style.backgroundColor = '#020617'; cell.innerHTML = `<span class="text-slate-700">0</span>`;
+                    }
+                    cell.onclick = () => inspectSub(bi, bj);
+                    grid.appendChild(cell);
+                }
+            }
+        }
+
+        function inspectSub(bi, bj) {
+            document.getElementById('blockCoordTag').innerText = `Block (${bi}, ${bj})`;
+            const sub = [];
+            for(let r=0; r<3; r++){
+                const row=[]; for(let c=0; c<3; c++) row.push(activeMatrix24[bi*3+r][bj*3+c]);
+                sub.push(row);
+            }
+            document.getElementById('submatrixRow0').innerText = sub[0].join('   ');
+            document.getElementById('submatrixRow1').innerText = sub[1].join('   ');
+            document.getElementById('submatrixRow2').innerText = sub[2].join('   ');
+            
+            let id = sub[0][0]===1 && sub[1][1]===1 && sub[2][2]===1;
+            let zr = sub.every(r=>r.every(v=>v===0));
+            document.getElementById('submatrixType').innerHTML = zr ? '$0_3$ (Zero)' : (id ? '$R_0$ (Identity)' : '$R_\\theta$ (Permutation)');
+            document.getElementById('submatrixDet').innerText = zr ? '0' : '±1';
+            
+            if(window.MathJax) MathJax.typesetPromise([document.getElementById('submatrixInspector')]);
+        }
+
+        function renderVector() {
+            const c = document.getElementById('vectorCubieList');
+            c.innerHTML = '';
+            for(let i=0; i<8; i++){
+                const b = i*3, c0=stateVector[b], c1=stateVector[b+1], c2=stateVector[b+2];
+                c.innerHTML += `
+                    <div class="bg-slate-900/90 p-2.5 rounded-xl border border-slate-800 flex justify-between items-center">
+                        <span class="text-slate-200">Cubie ${i+1}</span>
+                        <div class="space-x-1 font-mono">
+                            <span class="px-2 rounded font-bold" style="background:${COLORS[c0].hex};color:${c0==='W'||c0==='Y'?'#000':'#fff'}">${c0}</span>
+                            <span class="px-2 rounded font-bold" style="background:${COLORS[c1].hex};color:${c1==='W'||c1==='Y'?'#000':'#fff'}">${c1}</span>
+                            <span class="px-2 rounded font-bold" style="background:${COLORS[c2].hex};color:${c2==='W'||c2==='Y'?'#000':'#fff'}">${c2}</span>
+                        </div>
+                    </div>`;
+            }
+        }
+
+        function updateTimer() {
+            elapsedMs = Date.now() - startTime;
+            const tSec = elapsedMs / 1000;
+            const m = Math.floor(tSec/60).toString().padStart(2,'0');
+            const s = Math.floor(tSec%60).toString().padStart(2,'0');
+            const ms = Math.floor((elapsedMs%1000)/10).toString().padStart(2,'0');
+            document.getElementById('timerDisplay').innerText = `${m}:${s}.${ms}`;
+        }
+
+        function isSolved() {
+            // Isomorphic Face Check for orientation-independent win
+            const FACES = [
+                [0, 3, 6, 9],     // Up
+                [12, 15, 18, 21], // Down
+                [1, 4, 13, 16],   // Front
+                [7, 10, 19, 22],  // Back
+                [2, 11, 14, 23],  // Left
+                [5, 8, 17, 20]    // Right
+            ];
+            
+            return FACES.every(face => {
+                const firstColor = stateVector[face[0]];
+                return face.every(idx => stateVector[idx] === firstColor);
+            });
+        }
+
+        function autoAlign() {
+            if (isAnimating) return;
+            if (!isSolved()) {
+                alert("The cube must be solved (all faces strictly monochromatic) to auto-align orientations.");
+                return;
+            }
+
+            const target = SOLVED_STATE.join('');
+            if (stateVector.join('') === target) return; 
+
+            // Simple Breadth-First Search using only whole cube frame shifts
+            const moves = ['x', "x'", 'y', "y'", 'z', "z'"];
+            const queue = [{ state: stateVector, path: [] }];
+            const visited = new Set();
+            visited.add(stateVector.join(''));
+            
+            let foundPath = null;
+            
+            while (queue.length > 0) {
+                const curr = queue.shift();
+                if (curr.state.join('') === target) {
+                    foundPath = curr.path;
+                    break;
+                }
+                
+                for (let m of moves) {
+                    const perm = MOVE_PERMS[m];
+                    const nextState = new Array(24);
+                    for(let i=0; i<24; i++) nextState[i] = curr.state[perm[i]];
+                    const stateStr = nextState.join('');
+                    
+                    if (!visited.has(stateStr)) {
+                        visited.add(stateStr);
+                        queue.push({ state: nextState, path: [...curr.path, m] });
+                    }
+                }
+            }
+            
+            if (foundPath) {
+                foundPath.forEach(m => queueMove(m, 180, false));
+            }
+        }
+
+        function checkWin() {
+            if (isSolved() && moveCount > 0 && isScrambled && !isAnimating) {
+                isTimerRunning = false; clearInterval(timerInterval);
+                isScrambled = false;
+                confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
+                document.getElementById('vicTime').innerText = document.getElementById('timerDisplay').innerText;
+                document.getElementById('vicMoves').innerText = moveCount;
+                document.getElementById('modalVictory').classList.remove('hidden');
+            }
+        }
+
+        // Event Listeners
+        window.addEventListener('DOMContentLoaded', () => {
+            init3D();
+            updateUI();
+            inspectSub(0,0);
+
+            // Turn Buttons
+            document.querySelectorAll('.move-btn').forEach(btn => {
+                btn.onclick = () => {
+                    if (isAnimating && animationQueue.length > 1) return; // Prevent spamming queue too deep
+                    queueMove(btn.getAttribute('data-move'), 250, true);
+                };
+            });
+
+            // Scramble
+            document.getElementById('btnScramble').onclick = () => {
+                if(isAnimating) return;
+                stateVector = [...SOLVED_STATE]; activeMatrix24 = createIdentity24();
+                moveHistory = []; moveCount = 0; elapsedMs = 0; clearInterval(timerInterval); isTimerRunning = false;
+                document.getElementById('timerDisplay').innerText = "00:00.00";
+                
+                const moves = ['U',"U'",'D',"D'",'L',"L'",'R',"R'",'F',"F'",'B',"B'"];
+                for(let i=0; i<15; i++) {
+                    const m = moves[Math.floor(Math.random()*moves.length)];
+                    
+                    moveHistory.push(m); 
+                    
+                    queueMove(m, 60, false, () => {
+                        if(i === 14) { isScrambled = true; moveCount = 0; } 
+                    });
+                }
+            };
+
+            // Reset
+            document.getElementById('btnReset').onclick = () => {
+                if(isAnimating) return;
+                stateVector = [...SOLVED_STATE]; activeMatrix24 = createIdentity24();
+                moveHistory = []; moveCount = 0; isScrambled = false;
+                clearInterval(timerInterval); isTimerRunning = false; elapsedMs = 0;
+                lastMoveName = "None";
+                document.getElementById('timerDisplay').innerText = "00:00.00";
+                updateTextures(); updateUI();
+            };
+
+            // Auto Solve (Revert without winning)
+            document.getElementById('btnAutoSolve').onclick = () => {
+                if(isAnimating || isSolved()) return;
+                
+                isScrambled = false; // MUST NOT win
+                clearInterval(timerInterval); isTimerRunning = false;
+                
+                const solveSeq = [];
+                for(let i = moveHistory.length-1; i>=0; i--) {
+                    const m = moveHistory[i];
+                    solveSeq.push(m.endsWith("'") ? m.slice(0,1) : m+"'");
+                }
+                
+                solveSeq.forEach((m, idx) => {
+                    queueMove(m, 120, false, () => {
+                        if (idx === solveSeq.length - 1) {
+                            moveCount = 0; moveHistory = []; elapsedMs = 0;
+                            document.getElementById('timerDisplay').innerText = "00:00.00";
+                            lastMoveName = "None";
+                            updateUI();
+                        }
+                    });
+                });
+            };
+
+            // Auto Align Function
+            document.getElementById('btnAutoAlign').onclick = autoAlign;
+
+            // Modals
+            document.querySelectorAll('[id^="btnOpen"]').forEach(btn => {
+                btn.onclick = () => {
+                    const targetId = btn.id.replace('btnOpen', 'modal');
+                    const modal = document.getElementById(targetId);
+                    if(modal) {
+                        modal.classList.remove('hidden');
+                        if (window.MathJax) MathJax.typesetPromise([modal]).catch(e=>{});
+                    }
+                }
+            });
+            document.querySelectorAll('.close-modal').forEach(btn => {
+                btn.onclick = () => document.getElementById(btn.getAttribute('data-target')).classList.add('hidden');
+            });
+
+            // Tabs
+            document.getElementById('tabHeatmapBtn').onclick = (e) => {
+                e.target.classList.add('bg-slate-800','text-cyan-400'); e.target.classList.remove('text-slate-400');
+                document.getElementById('tabVectorBtn').classList.remove('bg-slate-800','text-cyan-400'); document.getElementById('tabVectorBtn').classList.add('text-slate-400');
+                document.getElementById('tabHeatmap').classList.remove('hidden'); document.getElementById('tabVector').classList.add('hidden');
+            };
+            document.getElementById('tabVectorBtn').onclick = (e) => {
+                e.target.classList.add('bg-slate-800','text-cyan-400'); e.target.classList.remove('text-slate-400');
+                document.getElementById('tabHeatmapBtn').classList.remove('bg-slate-800','text-cyan-400'); document.getElementById('tabHeatmapBtn').classList.add('text-slate-400');
+                document.getElementById('tabVector').classList.remove('hidden'); document.getElementById('tabHeatmap').classList.add('hidden');
+            };
+            document.getElementById('viewSparse24Btn').onclick = () => {
+                document.getElementById('heatmapContainer24').classList.remove('hidden'); document.getElementById('blockContainer8').classList.add('hidden');
+                document.getElementById('matrixViewTitle').innerText = "24×24 Sparse Permutation";
+            };
+            document.getElementById('viewBlock8Btn').onclick = () => {
+                document.getElementById('blockContainer8').classList.remove('hidden'); document.getElementById('heatmapContainer24').classList.add('hidden');
+                document.getElementById('matrixViewTitle').innerText = "8×8 Block Torsion";
+            };
+            document.getElementById('btnResetCamera').onclick = () => {
+                camera.position.set(3.5, 3.2, 4.5); controls.target.set(0,0,0);
+            };
+        });
+    </script>
+</body>
+</html>
